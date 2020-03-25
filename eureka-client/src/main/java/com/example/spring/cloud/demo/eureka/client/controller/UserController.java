@@ -4,6 +4,7 @@ import com.example.spring.cloud.demo.eureka.client.domain.User;
 import com.example.spring.cloud.demo.eureka.client.service.GetListRequest;
 import com.example.spring.cloud.demo.eureka.client.service.UserFeignClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,11 +37,14 @@ import java.util.List;
 public class UserController {
     @Autowired
     UserFeignClient userFeignClient;
+    @Value("eureka.client.serviceUrl.defaultZone")
+    private String defaultZone;
 
     @RequestMapping("/list")
     public String findUser(){
         ResponseEntity<String> result = userFeignClient.getUserList(new GetListRequest());
         System.out.println(result.getBody());
+        System.out.println(defaultZone);
         return result.getBody();
     }
 }
