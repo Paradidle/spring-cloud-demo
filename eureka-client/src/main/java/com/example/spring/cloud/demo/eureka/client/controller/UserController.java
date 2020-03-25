@@ -37,14 +37,14 @@ import java.util.List;
 public class UserController {
     @Autowired
     UserFeignClient userFeignClient;
-    @Value("eureka.client.serviceUrl.defaultZone")
+    @Value("eureka.server.port")
     private String defaultZone;
 
     @RequestMapping("/list")
     public String findUser(){
+        System.out.println("defaultZone"+defaultZone);
         ResponseEntity<String> result = userFeignClient.getUserList(new GetListRequest());
         System.out.println(result.getBody());
-        System.out.println(defaultZone);
         return result.getBody();
     }
 }
