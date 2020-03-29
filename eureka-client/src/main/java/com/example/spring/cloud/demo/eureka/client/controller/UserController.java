@@ -5,6 +5,7 @@ import com.example.spring.cloud.demo.eureka.client.service.GetListRequest;
 import com.example.spring.cloud.demo.eureka.client.service.UserFeignClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.core.env.Environment;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +36,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/user")
+@RefreshScope
 public class UserController {
     @Autowired
     UserFeignClient userFeignClient;
