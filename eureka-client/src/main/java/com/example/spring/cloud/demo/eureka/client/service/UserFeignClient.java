@@ -1,8 +1,6 @@
 package com.example.spring.cloud.demo.eureka.client.service;
 
-import com.example.spring.cloud.demo.eureka.client.domain.User;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
