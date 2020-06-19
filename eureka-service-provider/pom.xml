@@ -12,20 +12,16 @@
     <name>eureka-service-provider</name>
     <description>Demo project for Spring Boot</description>
 
-    <properties>
-        <java.version>1.8</java.version>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-            <version>${spring-cloud.version}</version>
+            <version>${spring.cloud.netfilx.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-config</artifactId>
-            <version>${spring-cloud.version}</version>
+            <version>${config.server.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
