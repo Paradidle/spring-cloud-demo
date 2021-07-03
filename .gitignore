@@ -13,3 +13,4 @@ gen
 overlays/*
 *.iws
 *.ipr
+/.idea/
