@@ -4,6 +4,7 @@ import com.example.spring.cloud.demo.eureka.client.domain.User;
 import com.example.spring.cloud.demo.eureka.client.service.GetListRequest;
 import com.example.spring.cloud.demo.eureka.client.service.UserFeignClient;
 import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.contrib.javanica.annotation.DefaultProperties;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import com.netflix.ribbon.proxy.annotation.Hystrix;
