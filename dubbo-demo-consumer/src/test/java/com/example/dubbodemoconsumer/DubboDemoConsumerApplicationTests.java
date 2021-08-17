@@ -1,10 +1,10 @@
-package com.paradidle.webflux.demo;
+package com.example.dubbodemoconsumer;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class WebfluxDemoApplicationTests {
+class DubboDemoConsumerApplicationTests {
 
     @Test
     void contextLoads() {
