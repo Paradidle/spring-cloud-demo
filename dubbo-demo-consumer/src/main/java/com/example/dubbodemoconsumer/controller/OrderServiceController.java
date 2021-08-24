@@ -25,11 +25,13 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 public class OrderServiceController {
-    @DubboReference
+    @DubboReference(protocol = "dubbo",loadbalance = "consistenthash"
+            ,mock = "com.example.dubbodemoconsumer.controller.MockOrderServiceImpl"
+            ,timeout = 500,cluster = "failfast")
     IOrderService iOrderService;
 
     @RequestMapping("/test")
-    public String test(){
+    public String test() throws InterruptedException {
         return iOrderService.sayHello();
     }
 
