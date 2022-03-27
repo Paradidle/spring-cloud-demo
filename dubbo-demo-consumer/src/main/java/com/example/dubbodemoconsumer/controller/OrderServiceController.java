@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderServiceController {
     @DubboReference(protocol = "dubbo",loadbalance = "consistenthash"
             ,mock = "com.example.dubbodemoconsumer.controller.MockOrderServiceImpl"
-            ,timeout = 500,cluster = "failfast")
+            ,timeout = 3000,cluster = "failfast",check = false)
     IOrderService iOrderService;
 
     @RequestMapping("/test")

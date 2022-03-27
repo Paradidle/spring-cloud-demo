@@ -44,7 +44,6 @@ public class FutureSample {
     public static void main(String[] args) {
         CompletableFuture<List<String>> future = CompletableFuture.supplyAsync(FutureSample::getTempList);
         CompletableFuture subFuture = future.thenApplyAsync(s-> CompletableFuture.supplyAsync(()-> s+"Str"));
-        subFuture.
         try {
             System.out.println(future.get());
         } catch (InterruptedException e) {

@@ -15,12 +15,12 @@ public class MessageQueueDemoApplication {
     public static void main(String[] args) {
         ConfigurableApplicationContext context = SpringApplication.run(MessageQueueDemoApplication.class, args);
         KafkaProducer sender = context.getBean(KafkaProducer.class);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 1000; i++) {
             //调用消息发送类中的消息发送方法
             sender.send(new ProducerRecord("test1",i+""));
             System.out.println("生产消息"+i);
             try {
-                Thread.sleep(3000);
+                Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

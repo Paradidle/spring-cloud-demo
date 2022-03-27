@@ -43,12 +43,9 @@ public class KafkaMessageProducer {
 
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, "hello, Kafka!");
         try {
-            producer.send(record, new Callback() {
-                @Override
-                public void onCompletion(RecordMetadata metadata, Exception exception) {
-                    if (exception == null) {
-                        System.out.println(metadata.partition() + ":" + metadata.offset());
-                    }
+            producer.send(record, (metadata, exception) -> {
+                if (exception == null) {
+                    System.out.println(metadata.partition() + ":" + metadata.offset());
                 }
             });
         } catch (Exception e) {
