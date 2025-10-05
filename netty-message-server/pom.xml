@@ -23,6 +23,7 @@
             <groupId>com.example</groupId>
             <artifactId>netty-message-common</artifactId>
             <version>0.0.1-SNAPSHOT</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
