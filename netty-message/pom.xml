@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-    <modelVersion>4.0.0</modelVersion>
-    <artifactId>netty-message</artifactId>
     <groupId>com.paradidle</groupId>
     <version>0.0.1-SNAPSHOT</version>
+    <modelVersion>4.0.0</modelVersion>
+    <artifactId>netty-message</artifactId>
     <name>netty-message</name>
     <packaging>pom</packaging>
 
