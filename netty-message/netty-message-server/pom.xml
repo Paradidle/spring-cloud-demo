@@ -61,7 +61,7 @@
                 <version>1.2.2</version>
                 <configuration>
                     <imageName>netty-message-server:${project.version}</imageName>
-                    <dockerDirectory>${project.basedir}/docker</dockerDirectory>
+                    <dockerDirectory>${project.basedir}/src/main/docker</dockerDirectory>
                     <resources>
                         <resource>
                             <targetPath>/</targetPath>
