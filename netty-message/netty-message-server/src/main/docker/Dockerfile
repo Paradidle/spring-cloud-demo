@@ -18,7 +18,7 @@ RUN echo -e "https://mirrors.aliyun.com/alpine/v3.6/main/" > /etc/apk/repositori
 RUN mkdir -p /root/applogs/gc
 
 # 复制 JAR 文件 - Maven 插件会自动处理这个复制
-COPY *.jar app.jar
+COPY *.jar netty-message-server.jar
 
 # 暴露端口
 EXPOSE 20007
@@ -27,4 +27,4 @@ EXPOSE 20007
 ENV JAVA_OPTS="-Djava.net.preferIPv4Stack=true -Dfile.encoding=UTF-8 -Duser.timezone=GMT+08 -server -Xms256m -Xmx1024m -XX:+PrintGCDetails -Xloggc:/root/applogs/gc/netty-message-server.gc -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/root/applogs/gc/netty-message-server.dump"
 
 # 启动应用
-ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /app/app.jar" ]
+ENTRYPOINT [ "sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar /app/netty-message-server.jar" ]
