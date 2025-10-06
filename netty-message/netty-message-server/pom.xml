@@ -92,17 +92,23 @@
                 </executions>
             </plugin>
 
+
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>2.7.0</version> <!-- 可选用一个稳定的版本 -->
                 <configuration>
-                    <archive>
-                        <manifest>
-                            <!-- 指定你的主类，即包含main方法的那个类 -->
-                            <mainClass>com.paradidle.nettymessageserver.NettyMessageServer</mainClass>
-                        </manifest>
-                    </archive>
+                    <!-- 关键：指定你的主类 -->
+                    <mainClass>com.paradidle.nettymessageserver.NettyMessageServer</mainClass>
                 </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <!-- 这个goal会替换掉默认的打包结果，生成可执行的胖JAR -->
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
         </plugins>
