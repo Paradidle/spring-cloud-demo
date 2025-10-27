@@ -31,6 +31,7 @@
         <module>dubbo-demo-producer</module>
         <module>dubbo-demo-api</module>
         <module>netty-message</module>
+        <module>springboot-fast-test</module>
     </modules>
     <properties>
         <java.version>1.8</java.version>
