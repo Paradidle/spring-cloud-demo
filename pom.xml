@@ -30,9 +30,6 @@
         <module>dubbo-demo-consumer</module>
         <module>dubbo-demo-producer</module>
         <module>dubbo-demo-api</module>
-        <module>netty-message-common</module>
-        <module>netty-message-client</module>
-        <module>netty-message-server</module>
         <module>netty-message</module>
     </modules>
     <properties>
