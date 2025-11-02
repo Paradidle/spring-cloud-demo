@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.time.Duration;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -72,14 +73,10 @@ public class WebFluxController {
                 }));
     }
 
-    @GetMapping(value = "/4", produces = MediaType.APPLICATION_STREAM_JSON_VALUE)
+    @GetMapping(value = "/4", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<User> flux4() {
-        return Flux.fromStream(IntStream.range(1, 10).mapToObj(i -> {
-            try {
-                TimeUnit.SECONDS.sleep(1);
-            } catch (InterruptedException e) {
-            }
-            return new User("user"+i);
-        }));
+        return Flux.range(1, 9)
+                .flatMap(i -> Mono.delay(Duration.ofSeconds(i))
+                        .thenReturn(new User("user" + i)));
     }
 }
