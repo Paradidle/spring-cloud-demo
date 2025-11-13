@@ -2,6 +2,8 @@ package com.paradidle.nettymessageserver;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.group.ChannelGroup;
+import java.util.concurrent.ConcurrentHashMap;
 import com.paradidle.nettymessagecommon.NettyMessage;
 
 /**
@@ -23,6 +25,10 @@ import com.paradidle.nettymessagecommon.NettyMessage;
  * @history Mender:chenyupeng；Date:2025/10/2；
  */
 public class ServerHandler extends ChannelInboundHandlerAdapter {
+
+    private final ConcurrentHashMap<String, ChannelGroup> channelGroupMap = new ConcurrentHashMap<>();
+
+    private final ConcurrentHashMap<Long, ChannelGroup> liveRooms = new ConcurrentHashMap<>();
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
