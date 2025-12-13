@@ -3,9 +3,9 @@ package com.example.springbootfasttest.controller;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Map;
-import java.util.Objects;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.Unmarshaller;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,18 +54,14 @@ public class OpenController {
     }
 
 
-    @PostMapping(value = "/receiveSubscriptionEvent", consumes = "application/xml")
-    public String receiveSubscriptionEvent(@RequestBody String xmlData){
+    @PostMapping(value = "/receiveSubscriptionEvent", consumes = MediaType.TEXT_XML_VALUE,
+            produces = MediaType.TEXT_XML_VALUE)
+    public String receiveSubscriptionEvent(@RequestBody WechatEventResult wechatEventResult){
         // signature=e417866efed469f22747dc0e2ee70f20f33ec180, nonce=1096287447, echostr=130213875726254039, timestamp=1765620611
-        System.out.println("xmlData" + xmlData);
+        System.out.println("wechatEventResult" + wechatEventResult.getFromUserName());
 
         // <xml><ToUserName><![CDATA[gh_3c403a5bf7ad]]></ToUserName><FromUserName><![CDATA[ol6701dxD1P7iJ3Fme6o4_-9eQMI]]></FromUserName><CreateTime>1765621512</CreateTime><MsgType><![CDATA[event]]></MsgType><Event><![CDATA[subscribe]]></Event><EventKey><![CDATA[]]></EventKey></xml>
 
-        WechatEventResult wechatEventResult = parseXml(xmlData);
-
-        if (Objects.isNull(wechatEventResult)) {
-            return "error";
-        }
 
         System.out.println(wechatEventResult.getFromUserName());
 
