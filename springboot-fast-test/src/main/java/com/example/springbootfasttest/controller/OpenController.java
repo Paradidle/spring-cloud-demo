@@ -23,12 +23,15 @@ public class OpenController {
 
     private final static String APP_SECRET = "2c4029e8ec7959614361d006943b7e5f";
 
+    private final static String TOKEN = "test";
+    private final static String ENCODING_AES_KEY = "6RYGllQyIbtMgxVWEdqpR5xPbdMgo7bUhFMTYewJkZk";
 
     @RequestMapping("/receiveSubscriptionEvent")
-    public String receiveSubscriptionEvent(String xmlData) {
+    public String receiveSubscriptionEvent(String signature, String nonce, Long timestamp, String echostr) {
+        // signature=e417866efed469f22747dc0e2ee70f20f33ec180, nonce=1096287447, echostr=130213875726254039, timestamp=1765620611
         // 解析XML数据
         // 处理订阅事件
         // 返回处理结果
-        return "success";
+        return echostr;
     }
 }
