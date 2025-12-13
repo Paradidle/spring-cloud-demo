@@ -54,7 +54,7 @@ public class OpenController {
 
 
     @PostMapping(value = "/receiveSubscriptionEvent", consumes = "application/xml")
-    public String receiveSubscriptionEvent(String xmlData) throws IOException {
+    public String receiveSubscriptionEvent(String xmlData){
         // signature=e417866efed469f22747dc0e2ee70f20f33ec180, nonce=1096287447, echostr=130213875726254039, timestamp=1765620611
 
 
@@ -68,30 +68,40 @@ public class OpenController {
 
         System.out.println(wechatEventResult.getFromUserName());
 
+        System.out.println("获取token开始");
         UriComponents tokenComponents = UriComponentsBuilder.fromUriString(ACCESS_TOKEN_URL)
                 .queryParam("grant_type", "client_credential")
                 .queryParam("appid", APP_ID)
                 .queryParam("secret", APP_SECRET)
                 .build();
 
-        String token = HttpClient.get(tokenComponents.toUriString());
+        try {
+            System.out.println("获取token url" + tokenComponents.toUriString());
+            String token = HttpClient.get(tokenComponents.toUriString());
 
 
-        Gson gson = new Gson();
+            Gson gson = new Gson();
 
-        Map<String,String> result = gson.fromJson(token, Map.class);
+            Map<String, String> result = gson.fromJson(token, Map.class);
 
-        String accessToken = result.get("access_token");
+            System.out.println("获取token url响应" + token);
+
+            String accessToken = result.get("access_token");
 
 
-        UriComponents uriComponents = UriComponentsBuilder.fromUriString(USER_INFO_URL)
-                .queryParam("access_token", accessToken)
-                .queryParam("openid", wechatEventResult.getFromUserName())
-                .queryParam("lang", "zh_CN")
-                .build();
+            System.out.println("获取用户信息开始");
+            UriComponents uriComponents = UriComponentsBuilder.fromUriString(USER_INFO_URL)
+                    .queryParam("access_token", accessToken)
+                    .queryParam("openid", wechatEventResult.getFromUserName())
+                    .queryParam("lang", "zh_CN")
+                    .build();
 
-        String response = HttpClient.get(uriComponents.toUriString());
-        System.out.println(response);
+            System.out.println("获取用户信息url" + uriComponents.toUriString());
+            String response = HttpClient.get(uriComponents.toUriString());
+            System.out.println("获取用户信息response" + response);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         // 解析XML数据
         // 处理订阅事件
