@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 import com.example.springbootfasttest.result.WechatEventResult;
@@ -28,6 +29,7 @@ import com.google.gson.Gson;
  * @author chenyupeng
  * @history Mender:chenyupeng；Date:2025/12/13；
  */
+@RestController
 @RequestMapping("/open")
 public class OpenController {
 
