@@ -13,7 +13,6 @@ import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 import com.example.springbootfasttest.result.WechatEventResult;
 import com.example.springbootfasttest.utils.HttpClient;
-import com.example.springbootfasttest.utils.OkHttpUtils;
 import com.google.gson.Gson;
 
 /**
@@ -42,8 +41,6 @@ public class OpenController {
     private final static String USER_INFO_URL = "https://api.weixin.qq.com/cgi-bin/user/info?access_token=ACCESS_TOKEN&openid=o6_bmjrPTlm6_2sgVt7hMZOPfL2M&lang=zh_CN";
 
     private final static String ACCESS_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=APPID&secret=APPSECRET";
-
-    private OkHttpUtils okHttpUtils = OkHttpUtils.getInstance();
 
     @GetMapping("/receiveSubscriptionEvent")
     public String verify(String signature, String nonce, Long timestamp, String echostr) {
