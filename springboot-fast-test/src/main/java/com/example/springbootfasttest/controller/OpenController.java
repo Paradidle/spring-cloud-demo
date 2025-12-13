@@ -55,10 +55,11 @@ public class OpenController {
             return "error";
         }
 
+        System.out.println(wechatEventResult.getFromUserName());
         // 解析XML数据
         // 处理订阅事件
         // 返回处理结果
-        return wechatEventResult.getFromUserName();
+        return "success";
     }
 
 
