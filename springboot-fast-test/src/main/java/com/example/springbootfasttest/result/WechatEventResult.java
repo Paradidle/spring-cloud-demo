@@ -55,5 +55,4 @@ public class WechatEventResult {
     @XmlElement(name = "EventKey")
     private String eventKey;
 
-    // getters and setters
 }
