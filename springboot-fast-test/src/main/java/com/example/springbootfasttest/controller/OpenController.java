@@ -41,9 +41,9 @@ public class OpenController {
     private final static String ENCODING_AES_KEY = "6RYGllQyIbtMgxVWEdqpR5xPbdMgo7bUhFMTYewJkZk";
 
 
-    private final static String USER_INFO_URL = "https://api.weixin.qq.com/cgi-bin/user/info?access_token=ACCESS_TOKEN&openid=o6_bmjrPTlm6_2sgVt7hMZOPfL2M&lang=zh_CN";
+    private final static String USER_INFO_URL = "https://api.weixin.qq.com/cgi-bin/user/info";
 
-    private final static String ACCESS_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=APPID&secret=APPSECRET";
+    private final static String ACCESS_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token";
 
     @GetMapping("/receiveSubscriptionEvent")
     public String verify(String signature, String nonce, Long timestamp, String echostr) {
