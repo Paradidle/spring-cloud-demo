@@ -8,6 +8,7 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.Unmarshaller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -54,7 +55,7 @@ public class OpenController {
 
 
     @PostMapping(value = "/receiveSubscriptionEvent", consumes = "application/xml")
-    public String receiveSubscriptionEvent(String xmlData){
+    public String receiveSubscriptionEvent(@RequestBody String xmlData){
         // signature=e417866efed469f22747dc0e2ee70f20f33ec180, nonce=1096287447, echostr=130213875726254039, timestamp=1765620611
 
 
