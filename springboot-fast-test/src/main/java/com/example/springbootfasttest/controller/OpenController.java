@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -58,9 +59,12 @@ public class OpenController {
 
     @PostMapping(value = "/receiveSubscriptionEvent", consumes = MediaType.TEXT_XML_VALUE,
             produces = MediaType.TEXT_XML_VALUE)
-    public String receiveSubscriptionEvent(@RequestBody WechatEventResult wechatEventResult){
+    public String receiveSubscriptionEvent(@RequestParam(required = false) String signature, @RequestParam(required = false) String nonce, @RequestParam(required = false) Long timestamp, @RequestBody WechatEventResult wechatEventResult){
         // signature=e417866efed469f22747dc0e2ee70f20f33ec180, nonce=1096287447, echostr=130213875726254039, timestamp=1765620611
         System.out.println("wechatEventResult" + wechatEventResult.getFromUserName());
+        System.out.println("signature" + signature);
+        System.out.println("nonce" + nonce);
+        System.out.println("timestamp" + timestamp);
 
         // <xml><ToUserName><![CDATA[gh_3c403a5bf7ad]]></ToUserName><FromUserName><![CDATA[ol6701dxD1P7iJ3Fme6o4_-9eQMI]]></FromUserName><CreateTime>1765621512</CreateTime><MsgType><![CDATA[event]]></MsgType><Event><![CDATA[subscribe]]></Event><EventKey><![CDATA[]]></EventKey></xml>
 
