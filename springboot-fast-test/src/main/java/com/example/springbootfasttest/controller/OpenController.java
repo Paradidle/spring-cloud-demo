@@ -1,9 +1,10 @@
 package com.example.springbootfasttest.controller;
 
-import java.io.IOException;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.util.Map;
 import javax.xml.bind.JAXBContext;
+import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
+import com.example.springbootfasttest.result.WechatEventResponseResult;
 import com.example.springbootfasttest.result.WechatEventResult;
 import com.example.springbootfasttest.utils.HttpClient;
 import com.google.gson.Gson;
@@ -79,6 +81,10 @@ public class OpenController {
                 .build();
 
         try {
+
+            JAXBContext context = JAXBContext.newInstance(WechatEventResponseResult.class);
+            Marshaller marshaller = context.createMarshaller();
+
             System.out.println("获取token url" + tokenComponents.toUriString());
             String token = HttpClient.get(tokenComponents.toUriString());
 
@@ -102,7 +108,20 @@ public class OpenController {
             System.out.println("获取用户信息url" + uriComponents.toUriString());
             String response = HttpClient.get(uriComponents.toUriString());
             System.out.println("获取用户信息response" + response);
-        } catch (IOException e) {
+
+
+            WechatEventResponseResult responseResult = new WechatEventResponseResult();
+            responseResult.setContent("感谢关注，跳转https://www.baidu.com");
+            responseResult.setCreateTime(System.currentTimeMillis()/ 1000);
+            responseResult.setMsgType("text");
+            responseResult.setFromUserName(wechatEventResult.getToUserName());
+            responseResult.setToUserName(wechatEventResult.getFromUserName());
+
+            StringWriter writer = new StringWriter();
+            marshaller.marshal(responseResult, writer);
+            return writer.toString();
+
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
