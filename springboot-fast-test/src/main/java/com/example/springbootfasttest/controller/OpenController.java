@@ -1,10 +1,8 @@
 package com.example.springbootfasttest.controller;
 
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.Map;
 import javax.xml.bind.JAXBContext;
-import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,7 +59,7 @@ public class OpenController {
 
     @PostMapping(value = "/receiveSubscriptionEvent", consumes = MediaType.TEXT_XML_VALUE,
             produces = MediaType.TEXT_XML_VALUE)
-    public String receiveSubscriptionEvent(@RequestParam(required = false) String signature, @RequestParam(required = false) String nonce, @RequestParam(required = false) Long timestamp, @RequestBody WechatEventResult wechatEventResult){
+    public WechatEventResponseResult receiveSubscriptionEvent(@RequestParam(required = false) String signature, @RequestParam(required = false) String nonce, @RequestParam(required = false) Long timestamp, @RequestBody WechatEventResult wechatEventResult){
         // signature=e417866efed469f22747dc0e2ee70f20f33ec180, nonce=1096287447, echostr=130213875726254039, timestamp=1765620611
         System.out.println("wechatEventResult" + wechatEventResult.getFromUserName());
         System.out.println("signature" + signature);
@@ -81,10 +79,6 @@ public class OpenController {
                 .build();
 
         try {
-
-            JAXBContext context = JAXBContext.newInstance(WechatEventResponseResult.class);
-            Marshaller marshaller = context.createMarshaller();
-
             System.out.println("获取token url" + tokenComponents.toUriString());
             String token = HttpClient.get(tokenComponents.toUriString());
 
@@ -111,15 +105,13 @@ public class OpenController {
 
 
             WechatEventResponseResult responseResult = new WechatEventResponseResult();
-            responseResult.setContent("感谢关注，跳转https://www.baidu.com");
+            responseResult.setContent("感谢关注，跳转https://www.bilibili.com");
             responseResult.setCreateTime(System.currentTimeMillis()/ 1000);
             responseResult.setMsgType("text");
             responseResult.setFromUserName(wechatEventResult.getToUserName());
             responseResult.setToUserName(wechatEventResult.getFromUserName());
 
-            StringWriter writer = new StringWriter();
-            marshaller.marshal(responseResult, writer);
-            return writer.toString();
+            return responseResult;
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -128,7 +120,7 @@ public class OpenController {
         // 解析XML数据
         // 处理订阅事件
         // 返回处理结果
-        return "success";
+        return null;
     }
 
 
