@@ -105,7 +105,7 @@ public class OpenController {
 
 
             WechatEventResponseResult responseResult = new WechatEventResponseResult();
-            responseResult.setContent("终于等到你！欢迎关注中国移动5G新通话！\n\n5G新通话是中国移动推出的新一代智慧视话产品，在这里你可以享受[趣味通话]带来的炫酷互动，可以体验[通话字幕]给予的高效交流，可以感受[明星来电]创造的接听惊喜......还有更多精彩应用等你探索哦！\n\n【立即体验】\n点击https://newcall.5gnewcall.cn:8443/web/#/?channel=300035，立即体验5G新通话！");
+            responseResult.setContent("感谢关注，https://www.bilibili.com");
             responseResult.setCreateTime(System.currentTimeMillis()/ 1000);
             responseResult.setMsgType("text");
             responseResult.setFromUserName(wechatEventResult.getToUserName());
