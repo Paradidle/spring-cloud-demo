@@ -34,9 +34,9 @@ import com.google.gson.Gson;
 @RequestMapping("/open")
 public class OpenController {
 
-    private final static String APP_ID = "";
+    private final static String APP_ID = "wx4963ced332c06b33";
 
-    private final static String APP_SECRET = "";
+    private final static String APP_SECRET = "2c4029e8ec7959614361d006943b7e5f";
 
     private final static String TOKEN = "test";
     private final static String ENCODING_AES_KEY = "6RYGllQyIbtMgxVWEdqpR5xPbdMgo7bUhFMTYewJkZk";
@@ -105,7 +105,20 @@ public class OpenController {
 
 
             WechatEventResponseResult responseResult = new WechatEventResponseResult();
-            responseResult.setContent("感谢关注，https://www.bilibili.com");
+            responseResult.setContent("感谢关注！我们为您准备了一份见面礼——百元微信立减金抽奖好礼，等您来开启！→点击https://www.baidu.com，前往5G新通话小程序抽取您的专属幸运！\n" +
+                    "    ————————————\n" +
+                    "    回复以下关键字，还有更多精彩功能等您解锁！\n" +
+                    "    1. 【视话版】或【商铺版】\n" +
+                    "    →开启5G新通话-点亮屏幕视话版新体验！\n" +
+                    "    2. 【点亮屏幕】\n" +
+                    "    →设置专属通话壁纸，定制您的专属来电画面，让通话更有趣！\n" +
+                    "    3. 【灵犀】或【AI健康问诊】\n" +
+                    "    →了解灵犀与蚂蚁阿福联合提供的专业健康问诊服务。\n" +
+                    "    4. 【同声传译】\n" +
+                    "    →通话实时翻译，沟通更自在，畅聊无压力！\n" +
+                    "    5. 【人工客服】\n" +
+                    "    →遇到问题？随时召唤客服小助手，为您解答5G新通话相关疑问。\n" +
+                    "    如您想畅享5G新通话更多功能，可【<a href=\"https://www.bilibili.com\">点击这里</a>】 立即进入AI通话H5页面，一键完成通话设置，定制专属通话体验。");
             responseResult.setCreateTime(System.currentTimeMillis()/ 1000);
             responseResult.setMsgType("text");
             responseResult.setFromUserName(wechatEventResult.getToUserName());
