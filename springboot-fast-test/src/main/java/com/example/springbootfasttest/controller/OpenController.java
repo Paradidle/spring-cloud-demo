@@ -34,9 +34,9 @@ import com.google.gson.Gson;
 @RequestMapping("/open")
 public class OpenController {
 
-    private final static String APP_ID = "";
+    private final static String APP_ID = System.getenv("APP_ID");
+    private final static String APP_SECRET = System.getenv("APP_SECRET");
 
-    private final static String APP_SECRET = "";
 
     private final static String TOKEN = "test";
     private final static String ENCODING_AES_KEY = "6RYGllQyIbtMgxVWEdqpR5xPbdMgo7bUhFMTYewJkZk";
