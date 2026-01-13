@@ -1,16 +1,23 @@
 package com.example.springbootfasttest.controller;
 
 import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.Unmarshaller;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 import com.example.springbootfasttest.result.WechatEventResponseResult;
@@ -121,6 +128,56 @@ public class OpenController {
         // 处理订阅事件
         // 返回处理结果
         return null;
+    }
+
+
+    @GetMapping("/createMenu")
+    public String createMenu() {
+        RestTemplate restTemplate = new RestTemplate();
+
+        System.out.println("获取token开始");
+        UriComponents tokenComponents = UriComponentsBuilder.fromUriString(ACCESS_TOKEN_URL)
+                .queryParam("grant_type", "client_credential")
+                .queryParam("appid", APP_ID)
+                .queryParam("secret", APP_SECRET)
+                .build();
+        try {
+
+
+            System.out.println("获取token url" + tokenComponents.toUriString());
+            String token = HttpClient.get(tokenComponents.toUriString());
+
+            Gson gson = new Gson();
+
+            Map<String, String> result = gson.fromJson(token, Map.class);
+
+            System.out.println("获取token url响应" + token);
+
+            String accessToken = result.get("access_token");
+
+
+            List<Map<String,Object>> buttonList = new ArrayList<>();
+            HashMap<String, Object> first = new HashMap<>();
+            HashMap<String, String> firstSub = new HashMap<>();
+
+            first.put("name","今日歌曲");
+
+            firstSub.put("name","biubiubiu");
+            firstSub.put("url", "https://www.bilibili.com");
+            first.put("sub_button",firstSub);
+
+            buttonList.add(first);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            ResponseEntity<Map> mapResponseEntity = restTemplate.postForEntity("https://api.weixin.qq.com/cgi-bin/menu/create?access_token=" + accessToken, new HttpEntity<>(buttonList, headers), Map.class);
+            System.out.println(gson.toJson(mapResponseEntity.getBody()));
+
+        }catch ( Exception e){
+             e.printStackTrace();
+        }
+        return "success";
     }
 
 
