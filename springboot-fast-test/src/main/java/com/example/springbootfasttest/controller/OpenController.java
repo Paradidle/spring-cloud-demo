@@ -155,7 +155,7 @@ public class OpenController {
 
             String accessToken = result.get("access_token");
 
-
+            Map<String,Object> body = new HashMap<>();
             List<Map<String,Object>> buttonList = new ArrayList<>();
             HashMap<String, Object> first = new HashMap<>();
             HashMap<String, String> firstSub = new HashMap<>();
@@ -166,15 +166,26 @@ public class OpenController {
             firstSub.put("url", "https://www.bilibili.com");
             first.put("sub_button",firstSub);
 
+
             buttonList.add(first);
+
+            HashMap<String, Object> secornd  = new HashMap<>();
+            HashMap<String, String> secorndSub = new HashMap<>();
+            secornd.put("name","视频");
+            secorndSub.put("name","diudiudiu");
+            secorndSub.put("url", "https://www.baidu.com");
+            secornd.put( "sub_button",secorndSub);
+
+            buttonList.add(secornd);
+            body.put("button", buttonList);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            ResponseEntity<Map> mapResponseEntity = restTemplate.postForEntity("https://api.weixin.qq.com/cgi-bin/menu/create?access_token=" + accessToken, new HttpEntity<>(buttonList, headers), Map.class);
+            ResponseEntity<Map> mapResponseEntity = restTemplate.postForEntity("https://api.weixin.qq.com/cgi-bin/menu/create?access_token=" + accessToken, new HttpEntity<>(body, headers), Map.class);
             System.out.println(gson.toJson(mapResponseEntity.getBody()));
 
-        }catch ( Exception e){
+        }catch (Exception e){
              e.printStackTrace();
         }
         return "success";
