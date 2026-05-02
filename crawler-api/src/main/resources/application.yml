@@ -1,0 +1,35 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: crawler-api
+  ai:
+    dashscope:
+      api-key: { qwen-api-key }
+      read-timeout: 30000
+    chat:
+      client:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.paradidle.crawler.api: DEBUG
+
+app:
+  run-test-on-startup: false
+
+# Chrome浏览器配置
+crawler:
+  chrome:
+    # 是否使用无头模式（Linux服务器部署时设为true）
+    headless: false
+    # 是否禁用GPU加速（服务器环境建议设为true）
+    disable-gpu: true
+    # 窗口大小（无头模式下需要设置）
+    window-size: 1920,1080
+    # 用户数据目录
+    user-data-dir: ${user.home}/.crawler-chrome-profile
+    # ChromeDriver缓存目录（可选，指定自定义路径）
+    driver-cache-dir: ${user.home}/.cache/selenium
