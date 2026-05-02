@@ -35,7 +35,7 @@ public class StockServiceImpl implements StockService {
     private String httpGet(String url) {
         return HttpRequest.get(url)
                 .header("Referer", "https://finance.sina.com.cn")
-                .timeout(5000)
+                .timeout(10000)
                 .execute()
                 .body();
     }
