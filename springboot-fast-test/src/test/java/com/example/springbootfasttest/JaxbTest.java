@@ -3,7 +3,8 @@ package com.example.springbootfasttest;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.UUID;
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * <p>
@@ -20,11 +21,32 @@ import java.util.UUID;
 
 public class JaxbTest {
     public static void main(String[] args) {
-        // nonce=136644785, echostr=5891250609890238191, timestamp=1765875374
-        String test = getSHA1("test", "1765875374", "136644785", "");
-        System.out.println(test);
+        String str = "AhpW7lvN0x6WRQMaGf7HTVpsJpK5DbBCZNoLFUKMRVLPzhiZ8ZUIFirvSFnIRrb3rYVAGIWpZEXJ4PDa3+o6ZcsItwNbMoNJeGlzEZZmGlM=";
+        System.out.println(decryptECB(str, "c1e5069d624bbaee0616f5fb44304d33"));
+    }
 
-        System.out.println(UUID.randomUUID().toString().replaceAll("-",""));
+
+    public static String decryptECB(String messageBase64, String key) {
+        final String cipherMode = "AES/ECB/PKCS5Padding";
+        final String charsetName = "UTF-8";
+        try {
+            final java.util.Base64.Decoder decoder = java.util.Base64.getDecoder();
+            byte[] messageByte = decoder.decode(messageBase64);
+
+            //
+            byte[] keyByte = key.getBytes(charsetName);
+            SecretKeySpec keySpec = new SecretKeySpec(keyByte, "AES");
+
+            Cipher cipher = Cipher.getInstance(cipherMode);
+            cipher.init(Cipher.DECRYPT_MODE, keySpec);
+            byte[] content = cipher.doFinal(messageByte);
+            String result = new String(content, charsetName);
+            return result;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+
     }
 
     //503725f9bbdee6dd68fc51ace7c8c41f39d7e5f4
