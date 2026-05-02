@@ -93,6 +93,7 @@ public class StockServiceImpl implements StockService {
             String prefix = stockCode.startsWith("6") ? "sh" : "sz";
             String url = SINA_STOCK_DETAIL_API + prefix + stockCode;
             String result = httpGet(url);
+            log.info("股票信息: {}", result);
             if (result == null || result.isEmpty()) {
                 log.warn("未获取到股票信息: {}", stockCode);
                 return null;
