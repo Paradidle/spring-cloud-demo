@@ -3,6 +3,7 @@ package com.example.strategiesapi.service.impl;
 import cn.hutool.http.HttpRequest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -59,13 +60,10 @@ public class StockServiceImpl implements StockService {
         List<String> stockCodes = new ArrayList<>();
         
         try {
-            // 东方财富全量A股 API - 沪A、深A、创业板、科创板、北交所
-            String[] markets = {"m:1+t:23", "m:0+t:6", "m:0+t:80", "m:1+t:8", "m:0+t:81"};
-            // m:1+t:23 = 上海A股
-            // m:0+t:6 = 深圳主板
-            // m:0+t:80 = 创业板
-            // m:1+t:8 = 科创板
-            // m:0+t:81 = 北交所
+            // 东方财富API - 只获取沪深两市股票（沪A、深A）
+            // m:1+t:2 = 上海主板 (600xxx)
+            // m:0+t:6 = 深圳主板 (000xxx, 001xxx)
+            String[] markets = {"m:1+t:2", "m:0+t:6"};
             
             for (String market : markets) {
                 int page = 1;
@@ -98,9 +96,12 @@ public class StockServiceImpl implements StockService {
                                         String code = stock.getString("f12");
                                         String name = stock.getString("f14");
                                         
+                                        // 过滤条件：排除ST、*、N开头股票，排除688（科创板）、8开头4位码（北交所）、创业板保留
                                         if (code != null && name != null && 
                                             !name.contains("ST") && !name.contains("*") &&
-                                            !name.contains("N ")) {
+                                            !name.contains("N ") &&
+                                            !code.startsWith("688") &&  // 过滤科创板
+                                            !(code.length() == 4 && code.startsWith("8"))) {  // 过滤北交所
                                             stockCodes.add(code);
                                         }
                                     }
@@ -210,10 +211,18 @@ public class StockServiceImpl implements StockService {
         int dailyCount = 0;
         int minuteCount = 0;
         
+        // 计算近一年的日期范围
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusYears(1);
+        String beginStr = startDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String endStr = endDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        log.info("历史数据范围: {} 至 {}", startDate, endDate);
+        
         for (int i = 0; i < stockList.size(); i++) {
             String stockCode = stockList.get(i);
             try {
                 String prefix = stockCode.startsWith("6") ? "sh" : "sz";
+                int marketId = stockCode.startsWith("6") ? 1 : 0;  // 1=上海, 0=深圳
                 
                 // 获取股票基本信息
                 LambdaQueryWrapper<StockBasic> wrapper = new LambdaQueryWrapper<>();
@@ -242,34 +251,73 @@ public class StockServiceImpl implements StockService {
                     Thread.sleep(REQUEST_INTERVAL);
                 }
                 
-                // 获取日线数据和分时数据
+                // 获取历史日线数据（近一年）
+                try {
+                    String histUrl = String.format(
+                        "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%d.%s&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58&klt=101&fqt=1&beg=%s&end=%s",
+                        marketId, stockCode, beginStr, endStr);
+                    String histResult = httpGet(histUrl);
+                    
+                    if (histResult != null && !histResult.isEmpty()) {
+                        int jsonStart = histResult.indexOf("{");
+                        int jsonEnd = histResult.lastIndexOf("}") + 1;
+                        if (jsonStart != -1 && jsonEnd > jsonStart) {
+                            String jsonStr = histResult.substring(jsonStart, jsonEnd);
+                            JSONObject histJson = JSON.parseObject(jsonStr);
+                            JSONObject data = histJson.getJSONObject("data");
+                            
+                            if (data != null) {
+                                JSONArray klines = data.getJSONArray("klines");
+                                if (klines != null && !klines.isEmpty()) {
+                                    for (int j = 0; j < klines.size(); j++) {
+                                        String kline = klines.getString(j);
+                                        String[] fields = kline.split(",");
+                                        if (fields.length >= 6) {
+                                            LocalDate tradeDate = LocalDate.parse(fields[0], DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                                            
+                                            LambdaQueryWrapper<StockDaily> wrapper2 = new LambdaQueryWrapper<>();
+                                            wrapper2.eq(StockDaily::getStockCode, stockCode)
+                                                    .eq(StockDaily::getTradeDate, tradeDate);
+                                            StockDaily existDaily = stockDailyService.getOne(wrapper2);
+                                            
+                                            StockDaily daily = existDaily != null ? existDaily : new StockDaily();
+                                            daily.setStockCode(stockCode);
+                                            daily.setTradeDate(tradeDate);
+                                            daily.setOpenPrice(BigDecimal.valueOf(Double.parseDouble(fields[1])));
+                                            daily.setClosePrice(BigDecimal.valueOf(Double.parseDouble(fields[2])));
+                                            daily.setHighPrice(BigDecimal.valueOf(Double.parseDouble(fields[3])));
+                                            daily.setLowPrice(BigDecimal.valueOf(Double.parseDouble(fields[4])));
+                                            
+                                            if (existDaily != null) {
+                                                stockDailyService.updateById(daily);
+                                            } else {
+                                                stockDailyService.save(daily);
+                                            }
+                                            dailyCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("获取历史日线数据失败: {}", stockCode, e);
+                }
+                
+                // 获取分时数据
                 StockInfo detail = getStockDetail(stockCode);
-                if (detail != null) {
+                if (detail != null && detail.getTrendData() != null && !detail.getTrendData().isEmpty()) {
                     LocalDate today = LocalDate.now();
-                    
-                    LambdaQueryWrapper<StockDaily> wrapper2 = new LambdaQueryWrapper<>();
-                    wrapper2.eq(StockDaily::getStockCode, stockCode)
+                    LambdaQueryWrapper<StockDaily> wrapper3 = new LambdaQueryWrapper<>();
+                    wrapper3.eq(StockDaily::getStockCode, stockCode)
                             .eq(StockDaily::getTradeDate, today);
-                    StockDaily existDaily = stockDailyService.getOne(wrapper2);
+                    StockDaily todayDaily = stockDailyService.getOne(wrapper3);
                     
-                    StockDaily daily = existDaily != null ? existDaily : new StockDaily();
-                    daily.setStockCode(stockCode);
-                    daily.setTradeDate(today);
-                    daily.setOpenPrice(BigDecimal.valueOf(detail.getOpenPrice()));
-                    daily.setHighPrice(BigDecimal.valueOf(detail.getHighPrice()));
-                    daily.setLowPrice(BigDecimal.valueOf(detail.getLowPrice()));
-                    
-                    if (detail.getTrendData() != null && !detail.getTrendData().isEmpty()) {
-                        daily.setMinuteData(JSON.toJSONString(detail.getTrendData()));
+                    if (todayDaily != null) {
+                        todayDaily.setMinuteData(JSON.toJSONString(detail.getTrendData()));
+                        stockDailyService.updateById(todayDaily);
                         minuteCount++;
                     }
-                    
-                    if (existDaily != null) {
-                        stockDailyService.updateById(daily);
-                    } else {
-                        stockDailyService.save(daily);
-                    }
-                    dailyCount++;
                 }
                 
                 // 打印进度
