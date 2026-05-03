@@ -69,7 +69,7 @@ public class StockServiceImpl implements StockService {
                 int page = 1;
                 int totalPages = 1;
                 
-                while (page <= totalPages && page <= 100) {  // 每市场最多100页
+                while (page <= totalPages) {  // 根据总数动态计算页数
                     String url = EAST_MONEY_STOCK_API + "?cb=jQuery&pn=" + page + "&pz=500&po=1&np=1&ut=&fltt=2&invt=2&fid=f3&fs=" + market + "&fields=f12,f14";
                     String result = httpGet(url);
                     
@@ -83,29 +83,56 @@ public class StockServiceImpl implements StockService {
                             JSONObject data = json.getJSONObject("data");
                             
                             if (data != null) {
+                                // 注意：虽然请求pz=500，但实际API每页只返回100条
+                                int pageSize = 100;
                                 if (page == 1) {
                                     long total = data.getLong("total") != null ? data.getLong("total") : 0;
-                                    totalPages = (int) Math.ceil((double) total / 500);
+                                    totalPages = (int) Math.ceil((double) total / pageSize);
                                     log.info("市场 {} 预计 {} 页，共 {} 只股票", market, totalPages, total);
                                 }
                                 
-                                JSONArray stocks = data.getJSONArray("diff");
-                                if (stocks != null && !stocks.isEmpty()) {
+                                // diff 可能是对象格式 {"0":{...},"1":{...}} 或数组格式 [{...},{...}]
+                                Object diffObj = data.get("diff");
+                                int pageCount = 0;
+                                
+                                if (diffObj instanceof JSONArray) {
+                                    // 数组格式
+                                    JSONArray stocks = (JSONArray) diffObj;
                                     for (int i = 0; i < stocks.size(); i++) {
                                         JSONObject stock = stocks.getJSONObject(i);
                                         String code = stock.getString("f12");
                                         String name = stock.getString("f14");
                                         
-                                        // 过滤条件：排除ST、*、N开头股票，排除688（科创板）、8开头4位码（北交所）、创业板保留
                                         if (code != null && name != null && 
                                             !name.contains("ST") && !name.contains("*") &&
                                             !name.contains("N ") &&
-                                            !code.startsWith("688") &&  // 过滤科创板
-                                            !(code.length() == 4 && code.startsWith("8"))) {  // 过滤北交所
+                                            !code.startsWith("688") &&
+                                            !(code.length() == 4 && code.startsWith("8"))) {
                                             stockCodes.add(code);
                                         }
+                                        pageCount++;
                                     }
-                                    log.info("市场 {} 第 {} 页，获取 {} 只股票，累计 {} 只", market, page, stocks.size(), stockCodes.size());
+                                } else if (diffObj instanceof JSONObject) {
+                                    // 对象格式
+                                    JSONObject stocksObj = (JSONObject) diffObj;
+                                    for (String key : stocksObj.keySet()) {
+                                        JSONObject stock = stocksObj.getJSONObject(key);
+                                        String code = stock.getString("f12");
+                                        String name = stock.getString("f14");
+                                        
+                                        if (code != null && name != null && 
+                                            !name.contains("ST") && !name.contains("*") &&
+                                            !name.contains("N ") &&
+                                            !code.startsWith("688") &&
+                                            !(code.length() == 4 && code.startsWith("8"))) {
+                                            stockCodes.add(code);
+                                        }
+                                        pageCount++;
+                                    }
+                                }
+                                
+                                if (pageCount > 0) {
+                                    log.info("市场 {} 第 {} 页，获取 {} 只股票，累计 {} 只", market, page, pageCount, stockCodes.size());
                                 }
                             }
                         }
@@ -200,7 +227,6 @@ public class StockServiceImpl implements StockService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void initHistoricalData() {
         log.info("使用东方财富API开始初始化股票数据");
         
