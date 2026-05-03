@@ -5,7 +5,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -60,10 +62,11 @@ public class StockServiceImpl implements StockService {
         List<String> stockCodes = new ArrayList<>();
         
         try {
-            // 东方财富API - 只获取沪深两市股票（沪A、深A）
+            // 东方财富API - 获取沪深两市股票（沪A、深A、创业板）
             // m:1+t:2 = 上海主板 (600xxx)
             // m:0+t:6 = 深圳主板 (000xxx, 001xxx)
-            String[] markets = {"m:1+t:2", "m:0+t:6"};
+            // m:0+t:80 = 创业板 (300xxx)
+            String[] markets = {"m:1+t:2", "m:0+t:6", "m:0+t:80"};
             
             for (String market : markets) {
                 int page = 1;
@@ -150,6 +153,92 @@ public class StockServiceImpl implements StockService {
         
         return stockCodes;
     }
+    
+    /**
+     * 获取股票代码和名称的映射（直接从东方财富获取，不调用新浪API）
+     */
+    private Map<String, String> getStockCodeNameMap() {
+        log.info("使用东方财富API获取股票代码和名称映射");
+        Map<String, String> stockMap = new LinkedHashMap<>();
+        
+        try {
+            String[] markets = {"m:1+t:2", "m:0+t:6", "m:0+t:80"};
+            
+            for (String market : markets) {
+                int page = 1;
+                int totalPages = 1;
+                
+                while (page <= totalPages) {
+                    String url = EAST_MONEY_STOCK_API + "?cb=jQuery&pn=" + page + "&pz=500&po=1&np=1&ut=&fltt=2&invt=2&fid=f3&fs=" + market + "&fields=f12,f14";
+                    String result = httpGet(url);
+                    
+                    if (result != null && !result.isEmpty()) {
+                        int start = result.indexOf("(");
+                        int end = result.lastIndexOf(")");
+                        if (start != -1 && end != -1) {
+                            String jsonStr = result.substring(start + 1, end);
+                            JSONObject json = JSON.parseObject(jsonStr);
+                            JSONObject data = json.getJSONObject("data");
+                            
+                            if (data != null) {
+                                int pageSize = 100;
+                                if (page == 1) {
+                                    long total = data.getLong("total") != null ? data.getLong("total") : 0;
+                                    totalPages = (int) Math.ceil((double) total / pageSize);
+                                    log.info("市场 {} 预计 {} 页，共 {} 只股票", market, totalPages, total);
+                                }
+                                
+                                Object diffObj = data.get("diff");
+                                
+                                if (diffObj instanceof JSONArray) {
+                                    JSONArray stocks = (JSONArray) diffObj;
+                                    for (int i = 0; i < stocks.size(); i++) {
+                                        JSONObject stock = stocks.getJSONObject(i);
+                                        String code = stock.getString("f12");
+                                        String name = stock.getString("f14");
+                                        
+                                        if (code != null && name != null && 
+                                            !name.contains("ST") && !name.contains("*") &&
+                                            !name.contains("N ") &&
+                                            !code.startsWith("688") &&
+                                            !(code.length() == 4 && code.startsWith("8"))) {
+                                            stockMap.put(code, name);
+                                        }
+                                    }
+                                } else if (diffObj instanceof JSONObject) {
+                                    JSONObject stocksObj = (JSONObject) diffObj;
+                                    for (String key : stocksObj.keySet()) {
+                                        JSONObject stock = stocksObj.getJSONObject(key);
+                                        String code = stock.getString("f12");
+                                        String name = stock.getString("f14");
+                                        
+                                        if (code != null && name != null && 
+                                            !name.contains("ST") && !name.contains("*") &&
+                                            !name.contains("N ") &&
+                                            !code.startsWith("688") &&
+                                            !(code.length() == 4 && code.startsWith("8"))) {
+                                            stockMap.put(code, name);
+                                        }
+                                    }
+                                }
+                                
+                                log.info("市场 {} 第 {} 页，累计获取 {} 只股票", market, page, stockMap.size());
+                            }
+                        }
+                    }
+                    
+                    page++;
+                    Thread.sleep(REQUEST_INTERVAL);
+                }
+            }
+            
+            log.info("东方财富API共获取 {} 只股票（代码+名称）", stockMap.size());
+        } catch (Exception e) {
+            log.error("获取股票代码名称映射失败", e);
+        }
+        
+        return stockMap;
+    }
 
     @Override
     public StockInfo getStockDetail(String stockCode) {
@@ -230,8 +319,9 @@ public class StockServiceImpl implements StockService {
     public void initHistoricalData() {
         log.info("使用东方财富API开始初始化股票数据");
         
-        List<String> stockList = getStockList();
-        log.info("共需要处理 {} 只股票", stockList.size());
+        // 直接从东方财富获取股票代码和名称映射（不调用新浪API）
+        Map<String, String> stockMap = getStockCodeNameMap();
+        log.info("共需要处理 {} 只股票", stockMap.size());
         
         int basicCount = 0;
         int dailyCount = 0;
@@ -244,37 +334,27 @@ public class StockServiceImpl implements StockService {
         String endStr = endDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         log.info("历史数据范围: {} 至 {}", startDate, endDate);
         
-        for (int i = 0; i < stockList.size(); i++) {
-            String stockCode = stockList.get(i);
+        for (Map.Entry<String, String> entry : stockMap.entrySet()) {
+            String stockCode = entry.getKey();
+            String stockName = entry.getValue();
+            
             try {
                 String prefix = stockCode.startsWith("6") ? "sh" : "sz";
                 int marketId = stockCode.startsWith("6") ? 1 : 0;  // 1=上海, 0=深圳
                 
-                // 获取股票基本信息
+                // 直接使用东方财富返回的名称插入股票基本信息（不调用新浪API）
                 LambdaQueryWrapper<StockBasic> wrapper = new LambdaQueryWrapper<>();
                 wrapper.eq(StockBasic::getStockCode, stockCode);
                 StockBasic existBasic = stockBasicService.getOne(wrapper);
                 
                 if (existBasic == null) {
-                    String url = SINA_STOCK_DETAIL_API + prefix + stockCode;
-                    String result = httpGet(url);
-                    if (result != null && !result.isEmpty()) {
-                        String[] parts = result.split("=");
-                        if (parts.length >= 2) {
-                            String data = parts[1].replace("\"", "").replace(";", "");
-                            String[] fields = data.split(",");
-                            if (fields.length >= 33) {
-                                StockBasic basic = new StockBasic();
-                                basic.setStockCode(stockCode);
-                                basic.setMarket(prefix);
-                                basic.setStockName(fields[0]);
-                                stockBasicService.save(basic);
-                                basicCount++;
-                                log.info("新增股票: {} - {}", stockCode, fields[0]);
-                            }
-                        }
-                    }
-                    Thread.sleep(REQUEST_INTERVAL);
+                    StockBasic basic = new StockBasic();
+                    basic.setStockCode(stockCode);
+                    basic.setMarket(prefix);
+                    basic.setStockName(stockName);
+                    stockBasicService.save(basic);
+                    basicCount++;
+                    log.info("新增股票: {} - {}", stockCode, stockName);
                 }
                 
                 // 获取历史日线数据（近一年）
@@ -330,28 +410,61 @@ public class StockServiceImpl implements StockService {
                     log.warn("获取历史日线数据失败: {}", stockCode, e);
                 }
                 
-                // 获取分时数据
-                StockInfo detail = getStockDetail(stockCode);
-                if (detail != null && detail.getTrendData() != null && !detail.getTrendData().isEmpty()) {
-                    LocalDate today = LocalDate.now();
-                    LambdaQueryWrapper<StockDaily> wrapper3 = new LambdaQueryWrapper<>();
-                    wrapper3.eq(StockDaily::getStockCode, stockCode)
-                            .eq(StockDaily::getTradeDate, today);
-                    StockDaily todayDaily = stockDailyService.getOne(wrapper3);
+                // 跳过新浪API获取分时数据（太慢），只获取今日分时
+                try {
+                    // 使用东方财富API获取今日分时数据（更快）
+                    String minuteUrl = String.format(
+                        "https://push2.eastmoney.com/api/qt/stock/trends2/get?secid=%d.%s&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58&iscr=0",
+                        marketId, stockCode);
+                    String minuteResult = httpGet(minuteUrl);
                     
-                    if (todayDaily != null) {
-                        todayDaily.setMinuteData(JSON.toJSONString(detail.getTrendData()));
-                        stockDailyService.updateById(todayDaily);
-                        minuteCount++;
+                    if (minuteResult != null && !minuteResult.isEmpty()) {
+                        int jsonStart = minuteResult.indexOf("{");
+                        int jsonEnd = minuteResult.lastIndexOf("}") + 1;
+                        if (jsonStart != -1 && jsonEnd > jsonStart) {
+                            String jsonStr = minuteResult.substring(jsonStart, jsonEnd);
+                            JSONObject minuteJson = JSON.parseObject(jsonStr);
+                            JSONObject data = minuteJson.getJSONObject("data");
+                            
+                            if (data != null) {
+                                JSONArray trends = data.getJSONArray("trends");
+                                if (trends != null && !trends.isEmpty()) {
+                                    List<Double> minuteList = new ArrayList<>();
+                                    for (int k = 0; k < trends.size(); k++) {
+                                        String trend = trends.getString(k);
+                                        String[] parts = trend.split(",");
+                                        if (parts.length >= 2) {
+                                            try {
+                                                minuteList.add(Double.parseDouble(parts[1]));
+                                            } catch (NumberFormatException ignored) {}
+                                        }
+                                    }
+                                    
+                                    if (!minuteList.isEmpty()) {
+                                        LocalDate today = LocalDate.now();
+                                        LambdaQueryWrapper<StockDaily> wrapper3 = new LambdaQueryWrapper<>();
+                                        wrapper3.eq(StockDaily::getStockCode, stockCode)
+                                                .eq(StockDaily::getTradeDate, today);
+                                        StockDaily todayDaily = stockDailyService.getOne(wrapper3);
+                                        
+                                        if (todayDaily != null) {
+                                            todayDaily.setMinuteData(JSON.toJSONString(minuteList));
+                                            stockDailyService.updateById(todayDaily);
+                                            minuteCount++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
+                } catch (Exception e) {
+                    log.debug("获取分时数据失败: {}", stockCode);
                 }
                 
                 // 打印进度
-                if ((i + 1) % 10 == 0) {
-                    log.info("进度: {}/{} ({}%), 累计: 基本信息{}条, 日线{}条, 分时{}条", 
-                             i + 1, stockList.size(), 
-                             (i + 1) * 100 / stockList.size(),
-                             basicCount, dailyCount, minuteCount);
+                if (basicCount % 100 == 0 && basicCount > 0) {
+                    log.info("已处理 {} 只股票，累计: 基本信息{}条, 日线{}条, 分时{}条", 
+                             basicCount, basicCount, dailyCount, minuteCount);
                 }
                 
                 Thread.sleep(REQUEST_INTERVAL);
@@ -399,6 +512,56 @@ public class StockServiceImpl implements StockService {
             log.error("获取分时数据失败: {}{}", prefix, stockCode, e);
         }
         return prices;
+    }
+    
+    @Override
+    public void initBasicDataOnly() {
+        log.info("=== 开始快速初始化股票基本信息 ===");
+        
+        // 获取东方财富API的股票代码和名称映射
+        Map<String, String> nameMap = getStockCodeNameMap();
+        log.info("东方财富API共获取 {} 只股票", nameMap.size());
+        
+        int count = 0;
+        for (Map.Entry<String, String> entry : nameMap.entrySet()) {
+            String stockCode = entry.getKey();
+            String stockName = entry.getValue();
+            
+            // 检查是否已存在
+            LambdaQueryWrapper<StockBasic> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(StockBasic::getStockCode, stockCode);
+            StockBasic existing = stockBasicService.getOne(wrapper);
+            
+            if (existing == null) {
+                StockBasic basic = new StockBasic();
+                basic.setStockCode(stockCode);
+                basic.setStockName(stockName);
+                
+                // 判断市场
+                String market = "sh";
+                if (stockCode.startsWith("0") || stockCode.startsWith("1") || stockCode.startsWith("2") || stockCode.startsWith("3")) {
+                    market = "sz";
+                }
+                basic.setMarket(market);
+                
+                stockBasicService.save(basic);
+                count++;
+            }
+            
+            if (count % 100 == 0) {
+                log.info("已插入 {} 只股票基本信息", count);
+            }
+        }
+        
+        log.info("=== 股票基本信息初始化完成，共插入 {} 只股票 ===", count);
+        log.info("当前数据库股票数量: {}", stockBasicService.count());
+    }
+    
+    @Override
+    public String getBasicCount() {
+        long count = stockBasicService.count();
+        long dailyCount = stockDailyService.count();
+        return String.format("股票基本信息: %d, 日线数据: %d", count, dailyCount);
     }
 
 }
