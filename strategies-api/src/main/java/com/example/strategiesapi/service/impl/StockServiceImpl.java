@@ -28,63 +28,99 @@ public class StockServiceImpl implements StockService {
     private final IStockBasicService stockBasicService;
     private final IStockDailyService stockDailyService;
 
-    private static final String SINA_STOCK_LIST_API = "http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData";
+    // 新浪API
     private static final String SINA_STOCK_DETAIL_API = "http://hq.sinajs.cn/list=";
     private static final String SINA_STOCK_HISTORY_API = "http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData";
+    
+    // 东方财富API - 获取全量A股
+    private static final String EAST_MONEY_STOCK_API = "http://push2.eastmoney.com/api/qt/clist/get";
+    
+    // 请求间隔（毫秒），避免被限流
+    private static final int REQUEST_INTERVAL = 300;
 
     private String httpGet(String url) {
-        return HttpRequest.get(url)
-                .header("Referer", "https://finance.sina.com.cn")
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .timeout(10000)
-                .execute()
-                .body();
+        try {
+            return HttpRequest.get(url)
+                    .header("Referer", "https://finance.sina.com.cn")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                    .timeout(10000)
+                    .execute()
+                    .body();
+        } catch (Exception e) {
+            log.error("HTTP请求失败: {}", url, e);
+            return null;
+        }
     }
 
     @Override
     public List<String> getStockList() {
-        log.info("获取沪深主板股票列表");
+        log.info("使用东方财富API获取全量A股股票列表");
         List<String> stockCodes = new ArrayList<>();
         
         try {
-            List<String> shStocks = fetchSinaStocksByPage("sh_a", 1, 80);
-            stockCodes.addAll(shStocks);
+            // 东方财富全量A股 API - 沪A、深A、创业板、科创板、北交所
+            String[] markets = {"m:1+t:23", "m:0+t:6", "m:0+t:80", "m:1+t:8", "m:0+t:81"};
+            // m:1+t:23 = 上海A股
+            // m:0+t:6 = 深圳主板
+            // m:0+t:80 = 创业板
+            // m:1+t:8 = 科创板
+            // m:0+t:81 = 北交所
             
-            List<String> szStocks = fetchSinaStocksByPage("sz_a", 1, 80);
-            stockCodes.addAll(szStocks);
+            for (String market : markets) {
+                int page = 1;
+                int totalPages = 1;
+                
+                while (page <= totalPages && page <= 100) {  // 每市场最多100页
+                    String url = EAST_MONEY_STOCK_API + "?cb=jQuery&pn=" + page + "&pz=500&po=1&np=1&ut=&fltt=2&invt=2&fid=f3&fs=" + market + "&fields=f12,f14";
+                    String result = httpGet(url);
+                    
+                    if (result != null && !result.isEmpty()) {
+                        // 解析JSONP响应
+                        int start = result.indexOf("(");
+                        int end = result.lastIndexOf(")");
+                        if (start != -1 && end != -1) {
+                            String jsonStr = result.substring(start + 1, end);
+                            JSONObject json = JSON.parseObject(jsonStr);
+                            JSONObject data = json.getJSONObject("data");
+                            
+                            if (data != null) {
+                                if (page == 1) {
+                                    long total = data.getLong("total") != null ? data.getLong("total") : 0;
+                                    totalPages = (int) Math.ceil((double) total / 500);
+                                    log.info("市场 {} 预计 {} 页，共 {} 只股票", market, totalPages, total);
+                                }
+                                
+                                JSONArray stocks = data.getJSONArray("diff");
+                                if (stocks != null && !stocks.isEmpty()) {
+                                    for (int i = 0; i < stocks.size(); i++) {
+                                        JSONObject stock = stocks.getJSONObject(i);
+                                        String code = stock.getString("f12");
+                                        String name = stock.getString("f14");
+                                        
+                                        if (code != null && name != null && 
+                                            !name.contains("ST") && !name.contains("*") &&
+                                            !name.contains("N ")) {
+                                            stockCodes.add(code);
+                                        }
+                                    }
+                                    log.info("市场 {} 第 {} 页，获取 {} 只股票，累计 {} 只", market, page, stocks.size(), stockCodes.size());
+                                }
+                            }
+                        }
+                    }
+                    
+                    page++;
+                    Thread.sleep(REQUEST_INTERVAL);
+                }
+            }
             
-            log.info("获取到{}只主板股票", stockCodes.size());
+            log.info("东方财富API共获取 {} 只股票", stockCodes.size());
         } catch (Exception e) {
             log.error("获取股票列表失败", e);
         }
         
         return stockCodes;
-    }
-
-    private List<String> fetchSinaStocksByPage(String node, int page, int count) {
-        List<String> stocks = new ArrayList<>();
-        try {
-            String url = SINA_STOCK_LIST_API + "?page=" + page + "&num=" + count + "&sort=symbol&asc=1&node=" + node + "&symbol=";
-            String result = httpGet(url);
-            
-            JSONArray jsonArray = JSON.parseArray(result);
-            
-            if (jsonArray != null) {
-                for (int i = 0; i < jsonArray.size(); i++) {
-                    JSONObject item = jsonArray.getJSONObject(i);
-                    String code = item.getString("code");
-                    String name = item.getString("name");
-                    
-                    if (!name.contains("ST") && !name.contains("*")) {
-                        stocks.add(code);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("获取{}股票列表失败", node, e);
-        }
-        return stocks;
     }
 
     @Override
@@ -165,22 +201,21 @@ public class StockServiceImpl implements StockService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void initHistoricalData() {
-        log.info("开始初始化股票数据");
+        log.info("使用东方财富API开始初始化股票数据");
         
         List<String> stockList = getStockList();
-        log.info("共需要处理{}只股票", stockList.size());
+        log.info("共需要处理 {} 只股票", stockList.size());
         
         int basicCount = 0;
         int dailyCount = 0;
+        int minuteCount = 0;
         
-        for (String stockCode : stockList) {
+        for (int i = 0; i < stockList.size(); i++) {
+            String stockCode = stockList.get(i);
             try {
                 String prefix = stockCode.startsWith("6") ? "sh" : "sz";
                 
-                StockBasic basic = new StockBasic();
-                basic.setStockCode(stockCode);
-                basic.setMarket(prefix);
-                
+                // 获取股票基本信息
                 LambdaQueryWrapper<StockBasic> wrapper = new LambdaQueryWrapper<>();
                 wrapper.eq(StockBasic::getStockCode, stockCode);
                 StockBasic existBasic = stockBasicService.getOne(wrapper);
@@ -194,14 +229,20 @@ public class StockServiceImpl implements StockService {
                             String data = parts[1].replace("\"", "").replace(";", "");
                             String[] fields = data.split(",");
                             if (fields.length >= 33) {
+                                StockBasic basic = new StockBasic();
+                                basic.setStockCode(stockCode);
+                                basic.setMarket(prefix);
                                 basic.setStockName(fields[0]);
                                 stockBasicService.save(basic);
                                 basicCount++;
+                                log.info("新增股票: {} - {}", stockCode, fields[0]);
                             }
                         }
                     }
+                    Thread.sleep(REQUEST_INTERVAL);
                 }
                 
+                // 获取日线数据和分时数据
                 StockInfo detail = getStockDetail(stockCode);
                 if (detail != null) {
                     LocalDate today = LocalDate.now();
@@ -220,6 +261,7 @@ public class StockServiceImpl implements StockService {
                     
                     if (detail.getTrendData() != null && !detail.getTrendData().isEmpty()) {
                         daily.setMinuteData(JSON.toJSONString(detail.getTrendData()));
+                        minuteCount++;
                     }
                     
                     if (existDaily != null) {
@@ -230,17 +272,21 @@ public class StockServiceImpl implements StockService {
                     dailyCount++;
                 }
                 
-                if ((basicCount + dailyCount) % 50 == 0) {
-                    log.info("已处理: 基本信息{}条, 日线数据{}条", basicCount, dailyCount);
+                // 打印进度
+                if ((i + 1) % 10 == 0) {
+                    log.info("进度: {}/{} ({}%), 累计: 基本信息{}条, 日线{}条, 分时{}条", 
+                             i + 1, stockList.size(), 
+                             (i + 1) * 100 / stockList.size(),
+                             basicCount, dailyCount, minuteCount);
                 }
                 
-                Thread.sleep(100);
+                Thread.sleep(REQUEST_INTERVAL);
             } catch (Exception e) {
-                log.error("处理股票{}时出错", stockCode, e);
+                log.error("处理股票 {} 时出错", stockCode, e);
             }
         }
         
-        log.info("数据初始化完成: 基本信息{}条, 日线数据{}条", basicCount, dailyCount);
+        log.info("数据初始化完成: 基本信息 {} 条, 日线数据 {} 条, 分时数据 {} 条", basicCount, dailyCount, minuteCount);
     }
 
     private List<Double> getMinuteData(String prefix, String stockCode) {
@@ -273,7 +319,7 @@ public class StockServiceImpl implements StockService {
                         prices.add(close);
                     }
                 }
-                log.info("获取到{}条分时数据", prices.size());
+                log.info("获取到 {} 条分时数据", prices.size());
             }
         } catch (Exception e) {
             log.error("获取分时数据失败: {}{}", prefix, stockCode, e);
