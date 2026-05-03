@@ -15,3 +15,4 @@ overlays/*
 *.ipr
 /.idea/
 *.log
+strategies-api/app.log
