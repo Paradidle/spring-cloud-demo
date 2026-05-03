@@ -24,4 +24,14 @@ public interface StockService {
      * 初始化历史数据，需要近1年的所有股票详情数据
      */
     void initHistoricalData();
+    
+    /**
+     * 快速初始化股票基本信息（只插入基本信息，不获取历史数据和分时）
+     */
+    void initBasicDataOnly();
+    
+    /**
+     * 获取股票基本信息数量
+     */
+    String getBasicCount();
 }

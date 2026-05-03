@@ -59,6 +59,19 @@ public class StrategiesController {
         new Thread(() -> stockScheduleService.fetchMinuteData()).start();
         return "分时数据拉取任务已启动，请查看日志了解进度";
     }
+    
+    // 快速初始化股票基本信息（只插入基本信息，不获取历史数据）
+    @PostMapping("/init-basic")
+    public String initBasicData() {
+        new Thread(() -> stockService.initBasicDataOnly()).start();
+        return "股票基本信息初始化任务已启动，请查看日志了解进度";
+    }
+    
+    // 获取股票基本信息数量
+    @GetMapping("/basic-count")
+    public String getBasicCount() {
+        return stockService.getBasicCount();
+    }
 
     @Data
     public static class SkillRequest {
