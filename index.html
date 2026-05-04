@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>策略中心 - 股票数据系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #111827; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+  </style>
+</head>
+<body class="text-white">
+  <!-- 顶部导航 -->
+  <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+    <div class="flex items-center justify-between max-w-7xl mx-auto">
+      <div class="flex items-center gap-4">
+        <h1 class="text-xl font-bold text-cyan-400">策略中心</h1>
+        <span class="text-gray-500 text-sm">股票数据系统</span>
+      </div>
+      <div class="flex gap-3">
+        <button id="btnRefresh" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition">
+          刷新列表
+        </button>
+        <button id="btnInit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded text-sm transition">
+          初始化数据
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex max-w-7xl mx-auto" style="height: calc(100vh - 73px);">
+    <!-- 左侧股票列表 -->
+    <aside class="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+      <div class="p-4 border-b border-gray-700">
+        <h2 class="text-sm font-medium text-gray-400">
+          股票列表 (<span id="stockCount">0</span> 只)
+        </h2>
+      </div>
+      <div id="stockList" class="flex-1 overflow-y-auto scrollbar-thin p-2">
+        <div class="text-center text-gray-500 py-8">加载中...</div>
+      </div>
+    </aside>
+
+    <!-- 右侧详情 -->
+    <main class="flex-1 p-6 overflow-y-auto">
+      <div id="stockDetail" class="hidden">
+        <!-- 股票信息卡片 -->
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-6">
+          <div class="flex items-start justify-between mb-6">
+            <div>
+              <h2 id="stockName" class="text-2xl font-bold text-white">--</h2>
+              <p id="stockCode" class="text-gray-400 text-sm mt-1">--</p>
+            </div>
+            <div class="text-right">
+              <div id="currentPrice" class="text-3xl font-bold text-cyan-400">--</div>
+              <p class="text-gray-400 text-sm mt-1">开盘价</p>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-4 gap-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+              <p class="text-gray-400 text-xs mb-1">最高价</p>
+              <p id="highPrice" class="text-xl font-bold text-green-400">--</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <p class="text-gray-400 text-xs mb-1">最低价</p>
+              <p id="lowPrice" class="text-xl font-bold text-red-400">--</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <p class="text-gray-400 text-xs mb-1">开盘价</p>
+              <p id="openPrice" class="text-xl font-bold text-white">--</p>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <p class="text-gray-400 text-xs mb-1">涨跌幅</p>
+              <p id="changePercent" class="text-xl font-bold text-gray-400">--</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分时图卡片 -->
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 class="text-lg font-medium text-white mb-4">5分钟分时图</h3>
+          <div id="trendChart" class="w-full h-48"></div>
+        </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div id="emptyState" class="flex items-center justify-center h-full">
+        <div class="text-center">
+          <div class="text-gray-500 text-lg mb-2">请从左侧选择一个股票</div>
+          <p class="text-gray-600 text-sm">共 <span id="totalCount">0</span> 只股票可选</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API_BASE = '/api/strategies';
+    let stocks = [];
+    let currentStock = null;
+
+    // 获取股票列表
+    async function fetchStocks() {
+      const stockListEl = document.getElementById('stockList');
+      stockListEl.innerHTML = '<div class="text-center text-gray-500 py-8">加载中...</div>';
+      
+      try {
+        const res = await fetch(`${API_BASE}/stocks`);
+        stocks = await res.json();
+        renderStockList();
+      } catch (e) {
+        stockListEl.innerHTML = '<div class="text-center text-red-400 py-8">获取股票列表失败，请检查后端服务</div>';
+        console.error(e);
+      }
+    }
+
+    // 渲染股票列表
+    function renderStockList() {
+      const stockListEl = document.getElementById('stockList');
+      document.getElementById('stockCount').textContent = stocks.length;
+      document.getElementById('totalCount').textContent = stocks.length;
+      
+      if (stocks.length === 0) {
+        stockListEl.innerHTML = '<div class="text-center text-gray-500 py-8">暂无数据</div>';
+        return;
+      }
+
+      let html = '<div class="grid grid-cols-3 gap-1">';
+      stocks.forEach(code => {
+        html += `<button onclick="selectStock('${code}')" class="p-2 text-xs rounded transition bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white">${code}</button>`;
+      });
+      html += '</div>';
+      stockListEl.innerHTML = html;
+    }
+
+    // 选择股票
+    async function selectStock(code) {
+      const detailEl = document.getElementById('stockDetail');
+      const emptyEl = document.getElementById('emptyState');
+      
+      detailEl.classList.add('hidden');
+      emptyEl.innerHTML = '<div class="text-center text-gray-500 py-8">加载中...</div>';
+      emptyEl.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`${API_BASE}/stock/${code}`);
+        const data = await res.json();
+        currentStock = data;
+        renderStockDetail(data);
+        detailEl.classList.remove('hidden');
+        emptyEl.classList.add('hidden');
+      } catch (e) {
+        emptyEl.innerHTML = '<div class="text-center text-red-400 py-8">获取股票详情失败</div>';
+        console.error(e);
+      }
+    }
+
+    // 渲染股票详情
+    function renderStockDetail(data) {
+      document.getElementById('stockName').textContent = data.name || '--';
+      document.getElementById('stockCode').textContent = data.code || '--';
+      document.getElementById('currentPrice').textContent = data.openPrice?.toFixed(2) || '--';
+      document.getElementById('highPrice').textContent = data.highPrice?.toFixed(2) || '--';
+      document.getElementById('lowPrice').textContent = data.lowPrice?.toFixed(2) || '--';
+      document.getElementById('openPrice').textContent = data.openPrice?.toFixed(2) || '--';
+      
+      const change = data.highPrice >= data.openPrice 
+        ? ((data.highPrice - data.openPrice) / data.openPrice * 100).toFixed(2)
+        : ((data.lowPrice - data.openPrice) / data.openPrice * 100).toFixed(2);
+      const changeEl = document.getElementById('changePercent');
+      changeEl.textContent = change + '%';
+      changeEl.className = `text-xl font-bold ${change >= 0 ? 'text-green-400' : 'text-red-400'}`;
+      
+      renderTrendChart(data.trendData || []);
+    }
+
+    // 渲染分时图
+    function renderTrendChart(data) {
+      const container = document.getElementById('trendChart');
+      if (!data || data.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 text-center py-8">暂无分时数据</div>';
+        return;
+      }
+
+      const width = container.clientWidth || 600;
+      const height = 200;
+      const padding = 30;
+      const chartWidth = width - padding * 2;
+      const chartHeight = height - padding * 2;
+
+      const min = Math.min(...data);
+      const max = Math.max(...data);
+      const range = max - min || 1;
+
+      let points = data.map((value, index) => {
+        const x = padding + (index / (data.length - 1)) * chartWidth;
+        const y = padding + chartHeight - ((value - min) / range) * chartHeight;
+        return `${x},${y}`;
+      }).join(' ');
+
+      let pathD = data.map((value, index) => {
+        const x = padding + (index / (data.length - 1)) * chartWidth;
+        const y = padding + chartHeight - ((value - min) / range) * chartHeight;
+        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+      }).join(' ');
+
+      container.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" class="w-full h-full">
+          <defs>
+            <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#06b6d4" />
+              <stop offset="100%" stop-color="#06b6d4" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          ${[0, 0.25, 0.5, 0.75, 1].map(ratio => `
+            <line x1="${padding}" y1="${padding + chartHeight * (1 - ratio)}" x2="${width - padding}" y2="${padding + chartHeight * (1 - ratio)}" stroke="#1f2937" stroke-width="1" stroke-dasharray="4"/>
+          `).join('')}
+          <polyline points="${points}" fill="none" stroke="#06b6d4" stroke-width="2"/>
+          <path d="${pathD} L ${width - padding} ${height - padding} L ${padding} ${height - padding} Z" fill="url(#gradient)" opacity="0.3"/>
+          <text x="${padding}" y="${padding - 5}" fill="#9ca3af" font-size="10">最高: ${max.toFixed(2)}</text>
+          <text x="${padding}" y="${height - padding + 15}" fill="#9ca3af" font-size="10">最低: ${min.toFixed(2)}</text>
+        </svg>
+      `;
+    }
+
+    // 初始化数据
+    async function initData() {
+      if (!confirm('确定要初始化所有股票数据吗？这将耗时较长。')) return;
+      
+      const btn = document.getElementById('btnInit');
+      btn.disabled = true;
+      btn.textContent = '初始化中...';
+      
+      try {
+        const res = await fetch(`${API_BASE}/init-history`, { method: 'POST' });
+        const data = await res.json();
+        alert('数据初始化任务已启动，请查看后端日志了解进度');
+        fetchStocks();
+      } catch (e) {
+        alert('启动初始化任务失败');
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '初始化数据';
+      }
+    }
+
+    // 事件绑定
+    document.getElementById('btnRefresh').addEventListener('click', fetchStocks);
+    document.getElementById('btnInit').addEventListener('click', initData);
+
+    // 初始加载
+    fetchStocks();
+  </script>
+</body>
+</html>

@@ -16,3 +16,9 @@ overlays/*
 /.idea/
 *.log
 strategies-api/app.log
+
+# Frontend
+node_modules/
+dist/
+.DS_Store
+*.local
