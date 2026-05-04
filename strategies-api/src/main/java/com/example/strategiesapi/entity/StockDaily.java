@@ -55,6 +55,11 @@ public class StockDaily {
     private BigDecimal closePrice;
 
     /**
+     * 成交量(手)
+     */
+    private Long volume;
+
+    /**
      * 总市值(元)
      */
     private BigDecimal totalMarketValue;
@@ -93,4 +98,12 @@ public class StockDaily {
      * 更新时间
      */
     private LocalDateTime updatedAt;
+
+    public Long getVolume() {
+        return volume;
+    }
+
+    public void setVolume(Long volume) {
+        this.volume = volume;
+    }
 }

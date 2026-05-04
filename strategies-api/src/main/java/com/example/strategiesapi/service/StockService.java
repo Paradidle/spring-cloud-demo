@@ -34,4 +34,14 @@ public interface StockService {
      * 获取股票基本信息数量
      */
     String getBasicCount();
+
+    /**
+     * 初始化5分钟K线数据（从新浪API获取近一年数据）
+     */
+    void initMinuteKlineData();
+
+    /**
+     * 获取日线数据数量
+     */
+    String getDailyCount();
 }

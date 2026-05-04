@@ -73,6 +73,19 @@ public class StrategiesController {
         return stockService.getBasicCount();
     }
 
+    // 初始化5分钟K线数据（从新浪API获取近一年数据）
+    @PostMapping("/init-minute-kline")
+    public String initMinuteKlineData() {
+        new Thread(() -> stockService.initMinuteKlineData()).start();
+        return "5分钟K线数据初始化任务已启动，请查看日志了解进度";
+    }
+
+    // 获取日线数据数量
+    @GetMapping("/daily-count")
+    public String getDailyCount() {
+        return stockService.getDailyCount();
+    }
+
     @Data
     public static class SkillRequest {
         private String skillName;
