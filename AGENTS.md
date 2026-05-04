@@ -22,20 +22,21 @@
 ## 目录结构
 
 ```
-/workspace/projects/                          # 前端项目
-├── index.html                                 # 入口页面
-├── vite.config.ts                            # Vite配置（含API代理）
-└── src/                                      # 源码目录
-
-/workspace/projects/spring-cloud-demo/          # 后端项目
-└── strategies-api/                            # 股票API模块
-    ├── src/main/java/.../
-    │   └── service/impl/StockServiceImpl.java  # 核心服务逻辑
-    ├── src/main/resources/
-    │   └── application.properties             # 数据库配置
-    └── sql/
-        ├── create_database.sql                # 创建数据库
-        └── stock_tables.sql                   # 建表脚本
+spring-cloud-demo/                      # 项目根目录
+├── strategies-api/                     # 后端服务 (Spring Boot)
+│   ├── src/main/java/.../
+│   │   └── service/impl/StockServiceImpl.java  # 核心服务逻辑
+│   └── src/main/resources/
+│       └── application.properties      # 数据库配置
+│
+├── strategies-front/                   # 前端项目 (Vite + React)
+│   ├── index.html                      # 入口页面
+│   ├── vite.config.ts                 # Vite配置（含API代理）
+│   └── src/                           # 源码目录
+│
+└── sql/                               # SQL脚本
+    ├── create_database.sql            # 创建数据库
+    └── stock_tables.sql               # 建表脚本
 ```
 
 ## 服务端口
