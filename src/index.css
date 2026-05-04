@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #06b6d4;
+  --primary-dark: #0891b2;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --dark-bg: #0f1419;
+  --dark-card: #1a1f2e;
+  --dark-hover: #252b3b;
+  --dark-border: #2d3748;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: var(--dark-bg);
+  color: #fff;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dark-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a5568;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* 图表容器 */
+.chart-container {
+  width: 100%;
+  height: 200px;
+  position: relative;
+}
+
+/* 按钮样式 */
+.btn-primary {
+  @apply bg-primary hover:bg-cyan-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+}
+
+.btn-secondary {
+  @apply bg-dark-hover hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+}
+
+.btn-success {
+  @apply bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+}
+
+.btn-danger {
+  @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+}
+
+/* 输入框样式 */
+.input-field {
+  @apply bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary transition-colors;
+}
+
+/* 卡片样式 */
+.card {
+  @apply bg-dark-card rounded-xl border border-dark-border overflow-hidden;
+}
+
+.card-header {
+  @apply bg-gradient-to-r from-primary to-cyan-400 px-6 py-4 flex items-center justify-between;
+}
+
+.card-title {
+  @apply text-white font-semibold text-lg;
+}
+
+/* 标签页样式 */
+.tab-active {
+  @apply text-primary border-b-2 border-primary;
+}
+
+/* 加载状态 */
+.loading-spinner {
+  border: 3px solid var(--dark-border);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 终端样式 */
+.terminal {
+  background: #000;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 200px;
+}
+
+.terminal-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.terminal-info { color: #06b6d4; }
+.terminal-success { color: #22c55e; }
+.terminal-warning { color: #f59e0b; }
+.terminal-error { color: #ef4444; }
