@@ -116,6 +116,34 @@ public class StrategiesController {
         return String.format("补充近 %d 天行情数据任务已启动", days);
     }
 
+    // 爬取财联社新闻
+    @PostMapping("/fetch-news")
+    public String fetchClsNews() {
+        new Thread(() -> stockService.fetchClsNews()).start();
+        return "财联社新闻爬取任务已启动";
+    }
+
+    // 爬取行业概念涨幅前5数据
+    @PostMapping("/fetch-category")
+    public String fetchCategoryTop5() {
+        new Thread(() -> stockService.fetchCategoryTop5()).start();
+        return "行业概念涨幅前5数据爬取任务已启动";
+    }
+
+    // 初始化新闻和行业概念表
+    @PostMapping("/init-news-category-tables")
+    public String initNewsAndCategoryTables() {
+        stockService.initNewsAndCategoryTables();
+        return "新闻和行业概念表初始化完成";
+    }
+
+    // 清空今日行业概念数据
+    @PostMapping("/clear-today-category")
+    public String clearTodayCategory() {
+        stockService.clearTodayCategoryData();
+        return "已清空今日行业概念数据";
+    }
+
     @Data
     public static class SkillRequest {
         private String skillName;

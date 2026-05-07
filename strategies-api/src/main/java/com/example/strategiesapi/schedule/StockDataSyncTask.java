@@ -65,4 +65,19 @@ public class StockDataSyncTask {
             log.error("数据维护失败", e);
         }
     }
+
+    /**
+     * 每日收盘后爬取行业概念涨幅前5数据
+     * 执行时间：每天 15:35（A股收盘后5分钟）
+     */
+    @Scheduled(cron = "0 35 15 * * ?")
+    public void fetchCategoryTop5AfterClose() {
+        log.info("=== 定时任务：爬取行业概念涨幅前5数据 ===");
+        try {
+            stockService.fetchCategoryTop5();
+            log.info("=== 行业概念涨幅前5数据爬取完成 ===");
+        } catch (Exception e) {
+            log.error("爬取行业概念涨幅前5数据失败", e);
+        }
+    }
 }

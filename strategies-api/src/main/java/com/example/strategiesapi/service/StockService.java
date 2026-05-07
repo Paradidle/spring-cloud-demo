@@ -65,4 +65,24 @@ public interface StockService {
      * @param days 补充最近几天的数据
      */
     void fillRecentData(int days);
+
+    /**
+     * 爬取财联社新闻（加红栏目）
+     */
+    void fetchClsNews();
+
+    /**
+     * 爬取行业概念涨幅前5数据
+     */
+    void fetchCategoryTop5();
+
+    /**
+     * 初始化新闻和行业概念表
+     */
+    void initNewsAndCategoryTables();
+
+    /**
+     * 清空今日行业概念数据（用于重新测试）
+     */
+    void clearTodayCategoryData();
 }

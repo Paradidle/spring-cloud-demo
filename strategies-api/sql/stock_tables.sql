@@ -98,6 +98,34 @@ WHERE sd.trade_date = (
 -- 5. 插入股票基本信息：
 --    INSERT INTO stock_basic (stock_code, market, stock_name) 
 --    VALUES ('600519', 'sh', '贵州茅台')
+
+-- 3. 财经新闻表（财联社加红栏目）
+CREATE TABLE IF NOT EXISTS `stock_daily_news` (
+    `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '主键ID',
+    `title` VARCHAR(255) NOT NULL COMMENT '新闻标题',
+    `summary` TEXT COMMENT '新闻内容摘要',
+    `source` VARCHAR(50) DEFAULT NULL COMMENT '新闻来源',
+    `news_type` VARCHAR(20) DEFAULT NULL COMMENT '新闻类型（快讯、头条、专题等）',
+    `url` VARCHAR(500) DEFAULT NULL COMMENT '新闻URL',
+    `publish_time` DATETIME DEFAULT NULL COMMENT '发布时间',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_publish_time` (`publish_time`),
+    KEY `idx_news_type` (`news_type`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='财经新闻表';
+
+-- 4. 行业概念涨幅表（每日收盘后更新）
+CREATE TABLE IF NOT EXISTS `stock_daily_category` (
+    `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '主键ID',
+    `data_date` DATE NOT NULL COMMENT '数据日期',
+    `industry_top5` JSON COMMENT '行业涨幅前5数据',
+    `concept_top5` JSON COMMENT '概念涨幅前5数据',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_data_date` (`data_date`),
+    KEY `idx_data_date` (`data_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业概念涨幅表';
 --    ON DUPLICATE KEY UPDATE stock_name = VALUES(stock_name);
 --
 -- 6. 插入股票日线数据：
