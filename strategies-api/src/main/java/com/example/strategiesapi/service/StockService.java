@@ -44,4 +44,25 @@ public interface StockService {
      * 获取日线数据数量
      */
     String getDailyCount();
+
+    /**
+     * 初始化大盘指数基本信息（上证、深证、创业板、科创50等）
+     */
+    void initIndexBasic();
+
+    /**
+     * 初始化大盘指数日线数据（近一年）
+     */
+    void initIndexDaily();
+
+    /**
+     * 更新今日行情数据（所有股票+大盘指数）
+     */
+    void updateTodayData();
+
+    /**
+     * 补充近几天缺失的行情数据
+     * @param days 补充最近几天的数据
+     */
+    void fillRecentData(int days);
 }

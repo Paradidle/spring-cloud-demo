@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.strategiesapi.model.StockInfo;
 import com.example.strategiesapi.service.IStockScheduleService;
@@ -84,6 +85,35 @@ public class StrategiesController {
     @GetMapping("/daily-count")
     public String getDailyCount() {
         return stockService.getDailyCount();
+    }
+
+    // 初始化大盘指数基本信息
+    @PostMapping("/init-index-basic")
+    public String initIndexBasic() {
+        new Thread(() -> stockService.initIndexBasic()).start();
+        return "大盘指数基本信息初始化任务已启动";
+    }
+
+    // 初始化大盘指数日线数据
+    @PostMapping("/init-index-daily")
+    public String initIndexDaily() {
+        new Thread(() -> stockService.initIndexDaily()).start();
+        return "大盘指数日线数据初始化任务已启动";
+    }
+
+    // 更新今日行情数据
+    @PostMapping("/update-today")
+    public String updateTodayData() {
+        new Thread(() -> stockService.updateTodayData()).start();
+        return "今日行情数据更新任务已启动";
+    }
+
+    // 补充近几天缺失的行情数据
+    @PostMapping("/fill-recent")
+    public String fillRecentData(@RequestParam(defaultValue = "5") int days) {
+        final int daysToFill = days;
+        new Thread(() -> stockService.fillRecentData(daysToFill)).start();
+        return String.format("补充近 %d 天行情数据任务已启动", days);
     }
 
     @Data

@@ -10,12 +10,14 @@ CREATE TABLE IF NOT EXISTS `stock_basic` (
     `stock_code` VARCHAR(10) NOT NULL COMMENT '股票代码',
     `market` VARCHAR(2) NOT NULL COMMENT '市场标识: sh-上海, sz-深圳',
     `stock_name` VARCHAR(50) NOT NULL COMMENT '股票名称',
+    `is_index` TINYINT(1) DEFAULT 0 COMMENT '是否为大盘指数',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_stock_code` (`stock_code`),
     KEY `idx_market` (`market`),
-    KEY `idx_stock_name` (`stock_name`)
+    KEY `idx_stock_name` (`stock_name`),
+    KEY `idx_is_index` (`is_index`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表';
 
 -- 2. 股票日线数据表

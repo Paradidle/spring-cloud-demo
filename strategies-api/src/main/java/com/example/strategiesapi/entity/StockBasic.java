@@ -46,4 +46,9 @@ public class StockBasic {
      * 更新时间
      */
     private LocalDateTime updatedAt;
+
+    /**
+     * 是否为大盘指数
+     */
+    private Boolean isIndex;
 }
