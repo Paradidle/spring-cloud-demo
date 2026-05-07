@@ -1401,11 +1401,11 @@ public class StockServiceImpl implements StockService {
                 return;
             }
 
-            // 爬取行业涨幅前5 - 使用新浪财经API
-            JSONArray industryTop5 = fetchSinaIndustryTop5();
+            // 爬取行业涨幅前5 - 使用财联社API
+            JSONArray industryTop5 = fetchClsPlateTop5("industry");
 
-            // 爬取概念涨幅前5 - 使用新浪财经API
-            JSONArray conceptTop5 = fetchSinaConceptTop5();
+            // 爬取概念涨幅前5 - 使用财联社API
+            JSONArray conceptTop5 = fetchClsPlateTop5("concept");
 
             // 保存数据
             StockDailyCategory category = new StockDailyCategory();
@@ -1426,126 +1426,41 @@ public class StockServiceImpl implements StockService {
     }
 
     /**
-     * 从东方财富爬取行业涨幅前5
+     * 从财联社爬取行业/概念涨幅前5（含资金流入）
+     * API: https://x-quote.cls.cn/web_quote/plate/hot_plate
      */
-    private JSONArray fetchSinaIndustryTop5() {
+    private JSONArray fetchClsPlateTop5(String type) {
         JSONArray result = new JSONArray();
         try {
-            // 东方财富行业板块API - 证监会行业分类
-            String url = "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=5&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:2&fields=f12,f14,f3";
+            String url = "https://x-quote.cls.cn/web_quote/plate/hot_plate?type=" + type + "&way=change&rever=1";
             String response = HttpRequest.get(url)
-                    .timeout(30000)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("Referer", "https://www.cls.cn/telegraph")
+                    .header("Accept", "application/json")
+                    .timeout(15000)
                     .execute()
                     .body();
 
-            if (response != null && response.contains("\"data\"")) {
+            if (response != null && response.contains("\"code\":200")) {
                 JSONObject json = JSON.parseObject(response);
-                JSONObject data = json.getJSONObject("data");
+                JSONArray data = json.getJSONArray("data");
                 if (data != null) {
-                    JSONArray diff = data.getJSONArray("diff");
-                    if (diff != null) {
-                        for (int i = 0; i < Math.min(diff.size(), 5); i++) {
-                            JSONObject item = diff.getJSONObject(i);
-                            JSONObject topItem = new JSONObject();
-                            topItem.put("name", item.getString("f14"));
-                            topItem.put("changeRate", item.getDoubleValue("f3") / 100.0);
-                            topItem.put("code", item.getString("f12"));
-                            result.add(topItem);
-                        }
+                    for (int i = 0; i < Math.min(data.size(), 5); i++) {
+                        JSONObject item = data.getJSONObject(i);
+                        JSONObject topItem = new JSONObject();
+                        topItem.put("name", item.getString("secu_name"));
+                        topItem.put("code", item.getString("secu_code"));
+                        topItem.put("changeRate", Math.round(item.getDoubleValue("change") * 10000.0) / 100.0);
+                        topItem.put("mainFundDiff", item.getLongValue("main_fund_diff"));
+                        result.add(topItem);
                     }
                 }
             }
         } catch (Exception e) {
-            log.error("爬取行业涨幅前5失败: {}", e.getMessage());
+            log.error("从财联社爬取{}涨幅前5失败: {}", type, e.getMessage());
         }
 
-        // 如果东方财富API失败，返回模拟数据
-        if (result.isEmpty()) {
-            log.info("使用模拟行业数据");
-            JSONObject item1 = new JSONObject();
-            item1.put("name", "银行");
-            item1.put("changeRate", 2.5);
-            result.add(item1);
-            JSONObject item2 = new JSONObject();
-            item2.put("name", "证券");
-            item2.put("changeRate", 1.8);
-            result.add(item2);
-            JSONObject item3 = new JSONObject();
-            item3.put("name", "白酒");
-            item3.put("changeRate", 1.5);
-            result.add(item3);
-            JSONObject item4 = new JSONObject();
-            item4.put("name", "新能源");
-            item4.put("changeRate", 1.2);
-            result.add(item4);
-            JSONObject item5 = new JSONObject();
-            item5.put("name", "医药");
-            item5.put("changeRate", 0.9);
-            result.add(item5);
-        }
-
-        return result;
-    }
-
-    /**
-     * 从东方财富爬取概念涨幅前5
-     */
-    private JSONArray fetchSinaConceptTop5() {
-        JSONArray result = new JSONArray();
-        try {
-            // 东方财富概念板块API
-            String url = "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=5&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:90+t:3&fields=f12,f14,f3";
-            String response = HttpRequest.get(url)
-                    .timeout(30000)
-                    .execute()
-                    .body();
-
-            if (response != null && response.contains("\"data\"")) {
-                JSONObject json = JSON.parseObject(response);
-                JSONObject data = json.getJSONObject("data");
-                if (data != null) {
-                    JSONArray diff = data.getJSONArray("diff");
-                    if (diff != null) {
-                        for (int i = 0; i < Math.min(diff.size(), 5); i++) {
-                            JSONObject item = diff.getJSONObject(i);
-                            JSONObject topItem = new JSONObject();
-                            topItem.put("name", item.getString("f14"));
-                            topItem.put("changeRate", item.getDoubleValue("f3") / 100.0);
-                            topItem.put("code", item.getString("f12"));
-                            result.add(topItem);
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("爬取概念涨幅前5失败: {}", e.getMessage());
-        }
-
-        // 如果失败，返回模拟数据
-        if (result.isEmpty()) {
-            log.info("使用模拟概念数据");
-            JSONObject item1 = new JSONObject();
-            item1.put("name", "人工智能");
-            item1.put("changeRate", 3.2);
-            result.add(item1);
-            JSONObject item2 = new JSONObject();
-            item2.put("name", "芯片概念");
-            item2.put("changeRate", 2.8);
-            result.add(item2);
-            JSONObject item3 = new JSONObject();
-            item3.put("name", "新能源汽车");
-            item3.put("changeRate", 2.1);
-            result.add(item3);
-            JSONObject item4 = new JSONObject();
-            item4.put("name", "量子科技");
-            item4.put("changeRate", 1.9);
-            result.add(item4);
-            JSONObject item5 = new JSONObject();
-            item5.put("name", "医疗器械");
-            item5.put("changeRate", 1.5);
-            result.add(item5);
-        }
-
+        log.info("财联社{}涨幅前5: {}", type, result.toJSONString());
         return result;
     }
 
