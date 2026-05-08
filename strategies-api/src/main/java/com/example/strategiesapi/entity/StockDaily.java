@@ -98,12 +98,4 @@ public class StockDaily {
      * 更新时间
      */
     private LocalDateTime updatedAt;
-
-    public Long getVolume() {
-        return volume;
-    }
-
-    public void setVolume(Long volume) {
-        this.volume = volume;
-    }
 }

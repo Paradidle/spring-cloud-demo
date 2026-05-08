@@ -1,6 +1,7 @@
 package com.example.strategiesapi.controller;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,21 +51,21 @@ public class StrategiesController {
     // 初始化历史数据
     @PostMapping("/init-history")
     public String initHistoricalData() {
-        new Thread(() -> stockService.initHistoricalData()).start();
+        CompletableFuture.runAsync(stockService::initHistoricalData);
         return "数据初始化任务已启动，请查看日志了解进度";
     }
 
     // 手动触发分时数据拉取
     @PostMapping("/fetch-minute-data")
     public String fetchMinuteData() {
-        new Thread(() -> stockScheduleService.fetchMinuteData()).start();
+        CompletableFuture.runAsync(stockScheduleService::fetchMinuteData);
         return "分时数据拉取任务已启动，请查看日志了解进度";
     }
     
     // 快速初始化股票基本信息（只插入基本信息，不获取历史数据）
     @PostMapping("/init-basic")
     public String initBasicData() {
-        new Thread(() -> stockService.initBasicDataOnly()).start();
+        CompletableFuture.runAsync(stockService::initBasicDataOnly);
         return "股票基本信息初始化任务已启动，请查看日志了解进度";
     }
     
@@ -77,7 +78,7 @@ public class StrategiesController {
     // 初始化5分钟K线数据（从新浪API获取近一年数据）
     @PostMapping("/init-minute-kline")
     public String initMinuteKlineData() {
-        new Thread(() -> stockService.initMinuteKlineData()).start();
+        CompletableFuture.runAsync(stockService::initMinuteKlineData);
         return "5分钟K线数据初始化任务已启动，请查看日志了解进度";
     }
 
@@ -90,21 +91,21 @@ public class StrategiesController {
     // 初始化大盘指数基本信息
     @PostMapping("/init-index-basic")
     public String initIndexBasic() {
-        new Thread(() -> stockService.initIndexBasic()).start();
+        CompletableFuture.runAsync(stockService::initIndexBasic);
         return "大盘指数基本信息初始化任务已启动";
     }
 
     // 初始化大盘指数日线数据
     @PostMapping("/init-index-daily")
     public String initIndexDaily() {
-        new Thread(() -> stockService.initIndexDaily()).start();
+        CompletableFuture.runAsync(stockService::initIndexDaily);
         return "大盘指数日线数据初始化任务已启动";
     }
 
     // 更新今日行情数据
     @PostMapping("/update-today")
     public String updateTodayData() {
-        new Thread(() -> stockService.updateTodayData()).start();
+        CompletableFuture.runAsync(stockService::updateTodayData);
         return "今日行情数据更新任务已启动";
     }
 
@@ -112,21 +113,22 @@ public class StrategiesController {
     @PostMapping("/fill-recent")
     public String fillRecentData(@RequestParam(defaultValue = "5") int days) {
         final int daysToFill = days;
-        new Thread(() -> stockService.fillRecentData(daysToFill)).start();
+        // 使用线程池执行异步任务，避免直接创建线程
+        CompletableFuture.runAsync(() -> stockService.fillRecentData(daysToFill));
         return String.format("补充近 %d 天行情数据任务已启动", days);
     }
 
     // 爬取财联社新闻
     @PostMapping("/fetch-news")
     public String fetchClsNews() {
-        new Thread(() -> stockService.fetchClsNews()).start();
+        CompletableFuture.runAsync(stockService::fetchClsNews);
         return "财联社新闻爬取任务已启动";
     }
 
     // 爬取行业概念涨幅前5数据
     @PostMapping("/fetch-category")
     public String fetchCategoryTop5() {
-        new Thread(() -> stockService.fetchCategoryTop5()).start();
+        CompletableFuture.runAsync(stockService::fetchCategoryTop5);
         return "行业概念涨幅前5数据爬取任务已启动";
     }
 
