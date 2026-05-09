@@ -23,6 +23,11 @@ public class StockDailyNews {
     private Long id;
 
     /**
+     * 新闻ID（来源网站的唯一标识，用于排重）
+     */
+    private String newsId;
+
+    /**
      * 新闻标题
      */
     private String title;

@@ -102,6 +102,7 @@ WHERE sd.trade_date = (
 -- 3. 财经新闻表（财联社加红栏目）
 CREATE TABLE IF NOT EXISTS `stock_daily_news` (
     `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '主键ID',
+    `news_id` VARCHAR(50) DEFAULT NULL COMMENT '新闻ID（来源网站唯一标识，用于排重）',
     `title` VARCHAR(255) NOT NULL COMMENT '新闻标题',
     `summary` TEXT COMMENT '新闻内容摘要',
     `source` VARCHAR(50) DEFAULT NULL COMMENT '新闻来源',
@@ -110,6 +111,7 @@ CREATE TABLE IF NOT EXISTS `stock_daily_news` (
     `publish_time` DATETIME DEFAULT NULL COMMENT '发布时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_news_id` (`news_id`),
     KEY `idx_publish_time` (`publish_time`),
     KEY `idx_news_type` (`news_type`),
     KEY `idx_create_time` (`create_time`)
