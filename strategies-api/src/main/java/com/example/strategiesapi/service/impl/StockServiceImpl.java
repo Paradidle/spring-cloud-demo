@@ -1170,12 +1170,72 @@ public class StockServiceImpl implements StockService {
                 log.info("开始处理 {} 的数据...", date);
                 AtomicInteger daySuccess = new AtomicInteger(0);
                 AtomicInteger dayFail = new AtomicInteger(0);
+                AtomicInteger daySkipped = new AtomicInteger(0);
+
+                // 先检查上证指数（sh000001）是否有数据，判断当天是否休市
+                boolean isTradingDay = false;
+                try {
+                    String shanghaiIndexUrl = SINA_STOCK_HISTORY_API + "?symbol=sh000001&scale=240&ma=no&datalen=10";
+                    String indexResult = httpGet(shanghaiIndexUrl);
+                    
+                    if (indexResult != null && !indexResult.isEmpty()) {
+                        int jsonStart = indexResult.indexOf("[");
+                        int jsonEnd = indexResult.lastIndexOf("]");
+                        if (jsonStart != -1 && jsonEnd != -1) {
+                            String jsonStr = indexResult.substring(jsonStart, jsonEnd + 1);
+                            JSONArray jsonArray = JSON.parseArray(jsonStr);
+                            
+                            if (jsonArray != null && !jsonArray.isEmpty()) {
+                                // 检查是否有当天的数据
+                                for (int i = 0; i < jsonArray.size(); i++) {
+                                    JSONObject item = jsonArray.getJSONObject(i);
+                                    String day = item.getString("day").substring(0, 10);
+                                    LocalDate dataDate = LocalDate.parse(day);
+                                    
+                                    if (dataDate.equals(date)) {
+                                        isTradingDay = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("检查上证指数数据时出错: {}", e.getMessage());
+                }
+                
+                // 如果上证指数没有当天数据，说明休市，跳过该日期
+                if (!isTradingDay) {
+                    log.warn("{} 上证指数无数据，判定为休市日，跳过该日期所有股票处理", date);
+                    return;
+                }
+                
+                log.info("{} 确认为交易日，开始处理股票数据", date);
 
                 // 对当天的所有股票进行处理
                 for (StockBasic stock : allStocks) {
                     try {
                         String stockCode = stock.getStockCode();
                         String prefix = stock.getMarket();
+
+                        // 检查数据库中是否已存在完整的K线数据
+                        synchronized (this) {
+                            LambdaQueryWrapper<StockDaily> existWrapper = new LambdaQueryWrapper<>();
+                            existWrapper.eq(StockDaily::getStockCode, stockCode)
+                                    .eq(StockDaily::getTradeDate, date);
+                            StockDaily existingRecord = stockDailyService.getOne(existWrapper);
+
+                            // 如果已存在且包含完整的K线数据（开盘价、收盘价、最高价、最低价、成交量都不为空），则跳过
+                            if (existingRecord != null 
+                                    && existingRecord.getOpenPrice() != null
+                                    && existingRecord.getClosePrice() != null
+                                    && existingRecord.getHighPrice() != null
+                                    && existingRecord.getLowPrice() != null
+                                    && existingRecord.getVolume() != null) {
+                                daySkipped.incrementAndGet();
+                                continue;
+                            }
+                        }
 
                         // 获取历史数据
                         String url = SINA_STOCK_HISTORY_API + "?symbol=" + prefix + stockCode
@@ -1203,7 +1263,7 @@ public class StockServiceImpl implements StockService {
                                             double low = item.getDouble("low");
                                             double volume = item.getDouble("volume");
 
-                                            // 检查是否已存在 - 使用同步块确保线程安全
+                                            // 更新或插入数据 - 使用同步块确保线程安全
                                             synchronized (this) {
                                                 LambdaQueryWrapper<StockDaily> wrapper = new LambdaQueryWrapper<>();
                                                 wrapper.eq(StockDaily::getStockCode, stockCode)
@@ -1245,7 +1305,7 @@ public class StockServiceImpl implements StockService {
                     }
                 }
 
-                log.info("{} 数据处理完成: 成功 {} 条, 失败 {} 条", date, daySuccess.get(), dayFail.get());
+                log.info("{} 数据处理完成: 成功 {} 条, 跳过 {} 条, 失败 {} 条", date, daySuccess.get(), daySkipped.get(), dayFail.get());
                 totalSuccess.addAndGet(daySuccess.get());
                 totalFail.addAndGet(dayFail.get());
             }, stockDataExecutor);
