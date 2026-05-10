@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.strategiesapi.model.StockInfo;
+import com.example.strategiesapi.service.DashScopeAnalysisService;
 import com.example.strategiesapi.service.IStockScheduleService;
 import com.example.strategiesapi.service.PythonSkillExecutor;
 import com.example.strategiesapi.service.StockService;
@@ -24,6 +25,7 @@ public class StrategiesController {
     private final PythonSkillExecutor pythonSkillExecutor;
     private final StockService stockService;
     private final IStockScheduleService stockScheduleService;
+    private final DashScopeAnalysisService dashScopeAnalysisService;
 
     @PostMapping("/execute")
     public String executeSkill(@RequestBody SkillRequest request) {
@@ -152,6 +154,12 @@ public class StrategiesController {
     public String clearTodayCategory() {
         stockService.clearTodayCategoryData();
         return "已清空今日行业概念数据";
+    }
+
+    // DashScope AI 股票箱体分析
+    @GetMapping("/analyze-box/{code}")
+    public String analyzeBoxPosition(@PathVariable String code) {
+        return dashScopeAnalysisService.analyzeBoxPosition(code);
     }
 
     @Data

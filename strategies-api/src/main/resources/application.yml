@@ -3,11 +3,11 @@ spring:
     name: strategies-api
   ai:
     dashscope:
-      api-key: ${DASHSCOPE_API_KEY:dummy}
+      api-key: ${DASHSCOPE_API_KEY}
       read-timeout: 30000
     chat:
       client:
-        enabled: false
+        enabled: true
   datasource:
     url: jdbc:mysql://${DB_HOST}:13306/stock_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true
     username: ${DB_USERNAME}
