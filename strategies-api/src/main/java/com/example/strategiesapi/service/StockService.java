@@ -85,4 +85,6 @@ public interface StockService {
      * 清空今日行业概念数据（用于重新测试）
      */
     void clearTodayCategoryData();
+
+    void fillAllHistoryData();
 }

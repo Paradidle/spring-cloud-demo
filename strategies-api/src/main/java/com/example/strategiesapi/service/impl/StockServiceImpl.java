@@ -540,7 +540,7 @@ public class StockServiceImpl implements StockService {
         try {
             // 调用新浪5分钟K线API
             String url = String.format(
-                    "http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=%s%s&scale=5&ma=no&datalen=2500",
+                    "http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=%s%s&scale=5&ma=no&datalen=99999",
                     prefix, stockCode
             );
 
@@ -1297,11 +1297,6 @@ public class StockServiceImpl implements StockService {
                     log.error("查询已存在数据失败: {}", e.getMessage());
                 }
 
-                // 收集需要保存的数据，最后批量处理
-                List<StockDaily> toInsert = new ArrayList<>();
-                List<StockDaily> toUpdate = new ArrayList<>();
-                Object batchLock = new Object();
-
                 // 对当天的所有股票进行处理
                 int totalStocks = allStocks.size();
                 AtomicInteger processedStocks = new AtomicInteger(0);
@@ -1326,10 +1321,11 @@ public class StockServiceImpl implements StockService {
 
                         // 获取历史数据
                         String url = SINA_STOCK_HISTORY_API + "?symbol=" + prefix + stockCode
-                                + "&scale=240&ma=no&datalen=10";
+                                + "&scale=240&ma=no&datalen=1023";
 
                         String result = httpGet(url);
 
+                        boolean foundData = false;
                         if (result != null && !result.isEmpty()) {
                             int jsonStart = result.indexOf("[");
                             int jsonEnd = result.lastIndexOf("]");
@@ -1366,17 +1362,41 @@ public class StockServiceImpl implements StockService {
                                                 daily.setMinuteData(minuteDataJson);
                                             }
 
-                                            // 添加到对应的列表（稍后批量处理）
-                                            synchronized (batchLock) {
-                                                // 先假设是新增，后续统一判断
-                                                toInsert.add(daily);
+                                            // 立即检查是否存在并插入或更新（单条操作）
+                                            LambdaQueryWrapper<StockDaily> wrapper = new LambdaQueryWrapper<>();
+                                            wrapper.eq(StockDaily::getStockCode, stockCode)
+                                                    .eq(StockDaily::getTradeDate, date);
+                                            StockDaily existing = stockDailyService.getOne(wrapper);
+                                            
+                                            if (existing != null) {
+                                                // 已存在，更新数据
+                                                existing.setOpenPrice(daily.getOpenPrice());
+                                                existing.setClosePrice(daily.getClosePrice());
+                                                existing.setHighPrice(daily.getHighPrice());
+                                                existing.setLowPrice(daily.getLowPrice());
+                                                existing.setVolume(daily.getVolume());
+                                                if (daily.getMinuteData() != null) {
+                                                    existing.setMinuteData(daily.getMinuteData());
+                                                }
+                                                stockDailyService.updateById(existing);
+                                            } else {
+                                                // 不存在，插入新数据
+                                                stockDailyService.save(daily);
                                             }
-                                            daySuccess.incrementAndGet();
+                                            foundData = true;
                                             break;
                                         }
                                     }
                                 }
                             }
+                        }
+                        
+                        // 根据是否找到数据进行统计
+                        if (foundData) {
+                            daySuccess.incrementAndGet();
+                        } else {
+                            dayFail.incrementAndGet();
+                            log.warn("{} 股票 {} 未找到当天数据", date, stockCode);
                         }
 
                         // 控制请求频率
@@ -1387,70 +1407,8 @@ public class StockServiceImpl implements StockService {
                     }
                 }
 
-                // 批量处理：先查询哪些已存在，然后分别插入和更新
-                if (!toInsert.isEmpty()) {
-                    try {
-                        // 提取所有股票代码
-                        List<String> stockCodes = toInsert.stream()
-                                .map(StockDaily::getStockCode)
-                                .collect(java.util.stream.Collectors.toList());
-
-                        // 批量查询哪些记录已存在
-                        String querySql = "SELECT stock_code FROM stock_daily WHERE trade_date = ? AND stock_code IN (" +
-                                stockCodes.stream().map(c -> "?").collect(java.util.stream.Collectors.joining(",")) + ")";
-                        Object[] queryParams = new Object[stockCodes.size() + 1];
-                        queryParams[0] = date;
-                        for (int i = 0; i < stockCodes.size(); i++) {
-                            queryParams[i + 1] = stockCodes.get(i);
-                        }
-                        List<String> existingCodes = jdbcTemplate.queryForList(querySql, String.class, queryParams);
-                        Set<String> existingCodeSet = new java.util.HashSet<>(existingCodes);
-
-                        // 分离需要插入和需要更新的数据
-                        for (StockDaily daily : toInsert) {
-                            if (existingCodeSet.contains(daily.getStockCode())) {
-                                // 已存在，需要更新
-                                toUpdate.add(daily);
-                            }
-                            // 否则保持 in toInsert list
-                        }
-
-                        // 移除需要更新的数据 from toInsert
-                        toInsert.removeAll(toUpdate);
-
-                        // 批量插入新数据
-                        if (!toInsert.isEmpty()) {
-                            stockDailyService.saveBatch(toInsert);
-                            log.info("{} 批量插入 {} 条新数据", date, toInsert.size());
-                        }
-
-                        // 批量更新已存在的数据
-                        if (!toUpdate.isEmpty()) {
-                            for (StockDaily updateItem : toUpdate) {
-                                LambdaQueryWrapper<StockDaily> wrapper = new LambdaQueryWrapper<>();
-                                wrapper.eq(StockDaily::getStockCode, updateItem.getStockCode())
-                                        .eq(StockDaily::getTradeDate, updateItem.getTradeDate());
-                                StockDaily existing = stockDailyService.getOne(wrapper);
-                                if (existing != null) {
-                                    existing.setOpenPrice(updateItem.getOpenPrice());
-                                    existing.setClosePrice(updateItem.getClosePrice());
-                                    existing.setHighPrice(updateItem.getHighPrice());
-                                    existing.setLowPrice(updateItem.getLowPrice());
-                                    existing.setVolume(updateItem.getVolume());
-                                    if (updateItem.getMinuteData() != null) {
-                                        existing.setMinuteData(updateItem.getMinuteData());
-                                    }
-                                    stockDailyService.updateById(existing);
-                                }
-                            }
-                            log.info("{} 批量更新 {} 条已存在数据", date, toUpdate.size());
-                        }
-                    } catch (Exception e) {
-                        log.error("{} 批量处理数据失败: {}", date, e.getMessage());
-                    }
-                }
-
-                log.info("=== {} 数据处理完成: 成功 {} 条, 跳过 {} 条, 失败 {} 条 ===", date, daySuccess.get(), daySkipped.get(), dayFail.get());
+                log.info("=== {} 数据处理完成: 总数 {} 只, 成功 {} 条, 跳过 {} 条, 失败 {} 条 ===", 
+                        date, totalStocks, daySuccess.get(), daySkipped.get(), dayFail.get());
                 totalSuccess.addAndGet(daySuccess.get());
                 totalFail.addAndGet(dayFail.get());
             }, stockDataExecutor);
@@ -1883,6 +1841,220 @@ public class StockServiceImpl implements StockService {
         } catch (Exception e) {
             log.error("清空今日数据失败: {}", e.getMessage());
         }
+    }
+
+    @Override
+    public void fillAllHistoryData() {
+
+        // 获取所有股票
+        List<StockBasic> allStocks = stockBasicService.list();
+        log.info("需要处理 {} 只股票/指数", allStocks.size());
+
+        AtomicInteger totalSuccess = new AtomicInteger(0);
+        AtomicInteger totalFail = new AtomicInteger(0);
+        AtomicInteger processedStocks = new AtomicInteger(0);
+
+        // 使用线程池处理每个股票
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        for (StockBasic stock : allStocks) {
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                int currentStock = processedStocks.incrementAndGet();
+                String stockCode = stock.getStockCode();
+                String prefix = stock.getMarket();
+                
+                try {
+                    // 每处理50只股票输出一次进度
+                    if (currentStock % 50 == 0 || currentStock == allStocks.size()) {
+                        log.info("整体进度: {}/{} ({:.1f}%)", currentStock, allStocks.size(), 
+                                (currentStock * 100.0 / allStocks.size()));
+                    }
+                    
+                    // 批量查询该股票已存在完整数据的日期（使用SQL直接过滤）
+                    String sql = "SELECT trade_date FROM stock_daily WHERE stock_code = ? " +
+                            "AND open_price IS NOT NULL AND close_price IS NOT NULL " +
+                            "AND high_price IS NOT NULL AND low_price IS NOT NULL " +
+                            "AND volume IS NOT NULL AND minute_data IS NOT NULL AND minute_data != ''";
+                    
+                    List<LocalDate> existingDates = jdbcTemplate.queryForList(sql, LocalDate.class, stockCode);
+                    Set<LocalDate> existingDateSet = new java.util.HashSet<>(existingDates);
+                    
+                    log.info("股票 {} 已有 {} 天完整数据", stockCode, existingDateSet.size());
+
+                    // 获取历史数据（最大1023条）
+                    String url = SINA_STOCK_HISTORY_API + "?symbol=" + prefix + stockCode
+                            + "&scale=240&ma=no&datalen=1023";
+                    
+                    String result = httpGet(url);
+                    
+                    if (result == null || result.isEmpty()) {
+                        log.warn("股票 {} API返回空数据", stockCode);
+                        totalFail.incrementAndGet();
+                        return;
+                    }
+                    
+                    // 解析日线JSON
+                    int jsonStart = result.indexOf("[");
+                    int jsonEnd = result.lastIndexOf("]");
+                    if (jsonStart == -1 || jsonEnd == -1) {
+                        log.warn("股票 {} JSON解析失败", stockCode);
+                        totalFail.incrementAndGet();
+                        return;
+                    }
+                                        
+                    String jsonStr = result.substring(jsonStart, jsonEnd + 1);
+                    JSONArray objects = JSON.parseArray(jsonStr);
+                    
+                    if (objects == null || objects.isEmpty()) {
+                        log.warn("股票 {} 数据为空", stockCode);
+                        totalFail.incrementAndGet();
+                        return;
+                    }
+                                        
+                    // 一次性获取该股票的所有5分钟K线数据
+                    String kLineUrl = String.format(
+                            "http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=%s%s&scale=5&ma=no&datalen=99999",
+                            prefix, stockCode
+                    );
+                                        
+                    String kLineResult = httpGet(kLineUrl);
+                    Map<String, String> minuteDataMap = new java.util.HashMap<>();
+                                        
+                    if (kLineResult != null && !kLineResult.isEmpty()) {
+                        try {
+                            int kLineStart = kLineResult.indexOf("[");
+                            int kLineEnd = kLineResult.lastIndexOf("]");
+                            if (kLineStart != -1 && kLineEnd != -1) {
+                                String kLineJsonStr = kLineResult.substring(kLineStart, kLineEnd + 1);
+                                JSONArray kLineArray = JSON.parseArray(kLineJsonStr);
+                                                    
+                                if (kLineArray != null && !kLineArray.isEmpty()) {
+                                    // 按日期分组5分钟K线数据
+                                    Map<String, List<JSONObject>> dailyKLineMap = new java.util.LinkedHashMap<>();
+                                    for (int j = 0; j < kLineArray.size(); j++) {
+                                        JSONObject item = kLineArray.getJSONObject(j);
+                                        String day = item.getString("day").substring(0, 10);
+                                        dailyKLineMap.computeIfAbsent(day, k -> new ArrayList<>()).add(item);
+                                    }
+                                                        
+                                    // 将每个日期的K线数据转换为JSON字符串
+                                    for (Map.Entry<String, List<JSONObject>> entry : dailyKLineMap.entrySet()) {
+                                        String date = entry.getKey();
+                                        List<JSONObject> candles = entry.getValue();
+                                                            
+                                        JSONArray minuteArray = new JSONArray();
+                                        for (JSONObject candle : candles) {
+                                            JSONArray point = new JSONArray();
+                                            point.add(candle.getString("day").substring(11)); // 时间部分 HH:mm
+                                            point.add(candle.getDouble("open"));
+                                            point.add(candle.getDouble("close"));
+                                            point.add(candle.getDouble("high"));
+                                            point.add(candle.getDouble("low"));
+                                            point.add(new BigDecimal(String.valueOf(candle.getDouble("volume"))).longValue());
+                                            minuteArray.add(point);
+                                        }
+                                                            
+                                        minuteDataMap.put(date, minuteArray.toJSONString());
+                                    }
+                                                        
+                                    log.info("股票 {} 获取到 {} 天的5分钟K线数据", stockCode, minuteDataMap.size());
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.warn("股票 {} 解析5分钟K线数据失败: {}", stockCode, e.getMessage());
+                        }
+                    }
+                    
+                    int stockSuccess = 0;
+                    int stockFail = 0;
+
+                    // 遍历所有历史数据
+                    for (int i = 0; i < objects.size(); i++) {
+                        try {
+                            JSONObject item = objects.getJSONObject(i);
+                            String dayStr = item.getString("day").substring(0, 10);
+                            LocalDate dataDate = LocalDate.parse(dayStr);
+
+                            // 如果数据库中已存在，跳过
+                            if (existingDateSet.contains(dataDate)) {
+                                continue;
+                            }
+                            
+                            double open = item.getDouble("open");
+                            double close = item.getDouble("close");
+                            double high = item.getDouble("high");
+                            double low = item.getDouble("low");
+                            double volume = item.getDouble("volume");
+
+                            // 从内存中获取5分钟分时K线数据（避免重复请求）
+                            String minuteDataJson = minuteDataMap.get(dayStr);
+
+                            // 构建StockDaily对象
+                            StockDaily daily = new StockDaily();
+                            daily.setStockCode(stockCode);
+                            daily.setTradeDate(dataDate);
+                            daily.setOpenPrice(BigDecimal.valueOf(open));
+                            daily.setClosePrice(BigDecimal.valueOf(close));
+                            daily.setHighPrice(BigDecimal.valueOf(high));
+                            daily.setLowPrice(BigDecimal.valueOf(low));
+                            daily.setVolume((long) volume);
+                            if (minuteDataJson != null) {
+                                daily.setMinuteData(minuteDataJson);
+                            }
+
+                            // 立即检查是否存在并插入或更新（单条操作）
+                            LambdaQueryWrapper<StockDaily> wrapper = new LambdaQueryWrapper<>();
+                            wrapper.eq(StockDaily::getStockCode, stockCode)
+                                    .eq(StockDaily::getTradeDate, dataDate);
+                            StockDaily existing = stockDailyService.getOne(wrapper);
+
+                            if (existing != null) {
+                                // 已存在，更新数据
+                                existing.setOpenPrice(daily.getOpenPrice());
+                                existing.setClosePrice(daily.getClosePrice());
+                                existing.setHighPrice(daily.getHighPrice());
+                                existing.setLowPrice(daily.getLowPrice());
+                                existing.setVolume(daily.getVolume());
+                                if (daily.getMinuteData() != null) {
+                                    existing.setMinuteData(daily.getMinuteData());
+                                }
+                                stockDailyService.updateById(existing);
+                            } else {
+                                // 不存在，插入新数据
+                                stockDailyService.save(daily);
+                            }
+                            
+                            stockSuccess++;
+                            
+                            // 控制请求频率（每10条数据休眠一次）
+                            if (stockSuccess % 10 == 0) {
+                                Thread.sleep(REQUEST_INTERVAL);
+                            }
+                        } catch (Exception e) {
+                            stockFail++;
+                            log.error("股票 {} 处理第 {} 条数据时出错: {}", stockCode, i, e.getMessage());
+                        }
+                    }
+                    
+                    totalSuccess.addAndGet(stockSuccess);
+                    totalFail.addAndGet(stockFail);
+                    
+                    log.info("=== 股票 {} 处理完成: 成功 {} 条, 失败 {} 条 ===", 
+                            stockCode, stockSuccess, stockFail);
+                    
+                } catch (Exception e) {
+                    totalFail.incrementAndGet();
+                    log.error("股票 {} 处理失败: {}", stockCode, e.getMessage(), e);
+                }
+            }, stockDataExecutor);
+
+            futures.add(future);
+        }
+
+        // 等待所有任务完成
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        log.info("=== 行情数据补充完成: 总成功 {} 条, 总失败 {} 条 ===", totalSuccess.get(), totalFail.get());
     }
 
 }

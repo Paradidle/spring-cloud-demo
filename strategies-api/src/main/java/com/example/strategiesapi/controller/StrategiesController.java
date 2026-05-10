@@ -118,6 +118,14 @@ public class StrategiesController {
         return String.format("补充近 %d 天行情数据任务已启动", days);
     }
 
+    // 补充近几天缺失的行情数据
+    @PostMapping("/fillAllHistoryData")
+    public String fillAllHistoryData() {
+        // 使用线程池执行异步任务，避免直接创建线程
+        CompletableFuture.runAsync(stockService::fillAllHistoryData);
+        return String.format("补充全历史行情数据任务已启动");
+    }
+
     // 爬取财联社新闻
     @PostMapping("/fetch-news")
     public String fetchClsNews() {
