@@ -122,9 +122,9 @@ public class StrategiesController {
 
     // 补充近几天缺失的行情数据
     @PostMapping("/fillAllHistoryData")
-    public String fillAllHistoryData() {
+    public String fillAllHistoryData(@RequestParam(defaultValue = "5") int days) {
         // 使用线程池执行异步任务，避免直接创建线程
-        CompletableFuture.runAsync(stockService::fillAllHistoryData);
+        CompletableFuture.runAsync(()->stockService.fillAllHistoryData(days));
         return String.format("补充全历史行情数据任务已启动");
     }
 

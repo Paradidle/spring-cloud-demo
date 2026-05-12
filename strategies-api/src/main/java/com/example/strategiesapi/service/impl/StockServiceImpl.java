@@ -70,6 +70,29 @@ public class StockServiceImpl implements StockService {
         }
     }
 
+    /**
+     * 根据股票代码判断市场标识
+     * @param stockCode 股票代码
+     * @return sh-上海, sz-深圳
+     */
+    private String determineMarket(String stockCode) {
+        if (stockCode == null || stockCode.isEmpty()) {
+            return "sh";
+        }
+        // 上海证券交易所：6开头（包括600、601、603、605、688等）
+        // 以及部分指数如000001(上证指数)
+        if (stockCode.startsWith("6") || stockCode.startsWith("9")) {
+            return "sh";
+        }
+        // 深圳证券交易所：0开头（000、001、002等）、1开头、2开头、3开头（创业板）
+        if (stockCode.startsWith("0") || stockCode.startsWith("1") || 
+            stockCode.startsWith("2") || stockCode.startsWith("3")) {
+            return "sz";
+        }
+        // 默认返回sh
+        return "sh";
+    }
+
     @Override
     public List<String> getStockList() {
         log.info("使用东方财富API获取全量A股股票列表");
@@ -395,13 +418,18 @@ public class StockServiceImpl implements StockService {
                                         if (fields.length >= 6) {
                                             LocalDate tradeDate = LocalDate.parse(fields[0], DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
+                                            // 确定市场标识
+                                            String market = determineMarket(stockCode);
+
                                             LambdaQueryWrapper<StockDaily> wrapper2 = new LambdaQueryWrapper<>();
                                             wrapper2.eq(StockDaily::getStockCode, stockCode)
+                                                    .eq(StockDaily::getMarket, market)
                                                     .eq(StockDaily::getTradeDate, tradeDate);
                                             StockDaily existDaily = stockDailyService.getOne(wrapper2);
 
                                             StockDaily daily = existDaily != null ? existDaily : new StockDaily();
                                             daily.setStockCode(stockCode);
+                                            daily.setMarket(market);
                                             daily.setTradeDate(tradeDate);
                                             daily.setOpenPrice(BigDecimal.valueOf(Double.parseDouble(fields[1])));
                                             daily.setClosePrice(BigDecimal.valueOf(Double.parseDouble(fields[2])));
@@ -457,8 +485,12 @@ public class StockServiceImpl implements StockService {
 
                                     if (!minuteList.isEmpty()) {
                                         LocalDate today = LocalDate.now();
+                                        // 确定市场标识
+                                        String market = determineMarket(stockCode);
+                                        
                                         LambdaQueryWrapper<StockDaily> wrapper3 = new LambdaQueryWrapper<>();
                                         wrapper3.eq(StockDaily::getStockCode, stockCode)
+                                                .eq(StockDaily::getMarket, market)
                                                 .eq(StockDaily::getTradeDate, today);
                                         StockDaily todayDaily = stockDailyService.getOne(wrapper3);
 
@@ -832,6 +864,9 @@ public class StockServiceImpl implements StockService {
 
             StockDaily daily = new StockDaily();
             daily.setStockCode(stockCode);
+            // 确定市场标识
+            String market = determineMarket(stockCode);
+            daily.setMarket(market);
             daily.setTradeDate(LocalDate.parse(day));
             daily.setOpenPrice(BigDecimal.valueOf(openPrice));
             daily.setClosePrice(BigDecimal.valueOf(closePrice));
@@ -892,8 +927,11 @@ public class StockServiceImpl implements StockService {
 
             // 批量查询已存在的日期
             Set<LocalDate> existingDates = new java.util.HashSet<>();
+            // 确定市场标识
+            String market = determineMarket(stockCode);
             LambdaQueryWrapper<StockDaily> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(StockDaily::getStockCode, stockCode)
+                    .eq(StockDaily::getMarket, market)
                     .ge(StockDaily::getTradeDate, startDate)
                     .le(StockDaily::getTradeDate, endDate);
             List<StockDaily> existingList = stockDailyService.list(wrapper);
@@ -946,6 +984,7 @@ public class StockServiceImpl implements StockService {
 
                 StockDaily daily = new StockDaily();
                 daily.setStockCode(stockCode);
+                daily.setMarket(market);
                 daily.setTradeDate(LocalDate.parse(day));
                 daily.setOpenPrice(BigDecimal.valueOf(openPrice));
                 daily.setClosePrice(BigDecimal.valueOf(closePrice));
@@ -1321,7 +1360,7 @@ public class StockServiceImpl implements StockService {
 
                         // 获取历史数据
                         String url = SINA_STOCK_HISTORY_API + "?symbol=" + prefix + stockCode
-                                + "&scale=240&ma=no&datalen=1023";
+                                + "&scale=240&ma=no&datalen=10";
 
                         String result = httpGet(url);
 
@@ -1352,6 +1391,9 @@ public class StockServiceImpl implements StockService {
                                             // 构建StockDaily对象
                                             StockDaily daily = new StockDaily();
                                             daily.setStockCode(stockCode);
+                                            // 确定市场标识
+                                            String market = determineMarket(stockCode);
+                                            daily.setMarket(market);
                                             daily.setTradeDate(date);
                                             daily.setOpenPrice(BigDecimal.valueOf(open));
                                             daily.setClosePrice(BigDecimal.valueOf(close));
@@ -1365,6 +1407,7 @@ public class StockServiceImpl implements StockService {
                                             // 立即检查是否存在并插入或更新（单条操作）
                                             LambdaQueryWrapper<StockDaily> wrapper = new LambdaQueryWrapper<>();
                                             wrapper.eq(StockDaily::getStockCode, stockCode)
+                                                    .eq(StockDaily::getMarket, market)
                                                     .eq(StockDaily::getTradeDate, date);
                                             StockDaily existing = stockDailyService.getOne(wrapper);
                                             
@@ -1844,7 +1887,7 @@ public class StockServiceImpl implements StockService {
     }
 
     @Override
-    public void fillAllHistoryData() {
+    public void fillAllHistoryData(int days) {
 
         // 获取所有股票
         List<StockBasic> allStocks = stockBasicService.list();
@@ -1871,19 +1914,19 @@ public class StockServiceImpl implements StockService {
                     }
                     
                     // 批量查询该股票已存在完整数据的日期（使用SQL直接过滤）
-                    String sql = "SELECT trade_date FROM stock_daily WHERE stock_code = ? " +
+                    String sql = "SELECT trade_date FROM stock_daily WHERE stock_code = ? and market = ? " +
                             "AND open_price IS NOT NULL AND close_price IS NOT NULL " +
                             "AND high_price IS NOT NULL AND low_price IS NOT NULL " +
                             "AND volume IS NOT NULL AND minute_data IS NOT NULL AND minute_data != ''";
                     
-                    List<LocalDate> existingDates = jdbcTemplate.queryForList(sql, LocalDate.class, stockCode);
+                    List<LocalDate> existingDates = jdbcTemplate.queryForList(sql, LocalDate.class, stockCode, stock.getMarket());
                     Set<LocalDate> existingDateSet = new java.util.HashSet<>(existingDates);
                     
                     log.info("股票 {} 已有 {} 天完整数据", stockCode, existingDateSet.size());
 
                     // 获取历史数据（最大1023条）
                     String url = SINA_STOCK_HISTORY_API + "?symbol=" + prefix + stockCode
-                            + "&scale=240&ma=no&datalen=1023";
+                            + "&scale=240&ma=no&datalen=" + days;
                     
                     String result = httpGet(url);
                     
@@ -1913,7 +1956,7 @@ public class StockServiceImpl implements StockService {
                                         
                     // 一次性获取该股票的所有5分钟K线数据
                     String kLineUrl = String.format(
-                            "http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=%s%s&scale=5&ma=no&datalen=99999",
+                            "http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=%s%s&scale=5&ma=no&datalen=" + days,
                             prefix, stockCode
                     );
                                         
@@ -1992,6 +2035,8 @@ public class StockServiceImpl implements StockService {
                             // 构建StockDaily对象
                             StockDaily daily = new StockDaily();
                             daily.setStockCode(stockCode);
+                            // 确定市场标识
+                            daily.setMarket(stock.getMarket());
                             daily.setTradeDate(dataDate);
                             daily.setOpenPrice(BigDecimal.valueOf(open));
                             daily.setClosePrice(BigDecimal.valueOf(close));
@@ -2005,6 +2050,7 @@ public class StockServiceImpl implements StockService {
                             // 立即检查是否存在并插入或更新（单条操作）
                             LambdaQueryWrapper<StockDaily> wrapper = new LambdaQueryWrapper<>();
                             wrapper.eq(StockDaily::getStockCode, stockCode)
+                                    .eq(StockDaily::getMarket, stock.getMarket())
                                     .eq(StockDaily::getTradeDate, dataDate);
                             StockDaily existing = stockDailyService.getOne(wrapper);
 

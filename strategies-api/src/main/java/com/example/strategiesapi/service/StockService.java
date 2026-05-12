@@ -86,5 +86,5 @@ public interface StockService {
      */
     void clearTodayCategoryData();
 
-    void fillAllHistoryData();
+    void fillAllHistoryData(int days);
 }

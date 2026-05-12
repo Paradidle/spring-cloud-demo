@@ -61,7 +61,7 @@ SELECT
     sd.main_net_inflow,
     sd.main_net_outflow
 FROM stock_basic sb
-INNER JOIN stock_daily sd ON sb.stock_code = sd.stock_code
+INNER JOIN stock_daily sd ON sb.stock_code = sd.stock_code AND sb.market = sd.market
 WHERE sd.trade_date = (
     SELECT MAX(trade_date) 
     FROM stock_daily
@@ -74,21 +74,22 @@ WHERE sd.trade_date = (
 --    - idx_stock_name: 加速按股票名称搜索
 --
 -- 2. stock_daily表：
---    - uk_stock_date: 联合唯一索引，保证同一股票同一天只有一条记录
+--    - uk_market_stock_date: 联合唯一索引，保证同一市场、同一股票同一天只有一条记录
 --    - idx_trade_date: 加速按日期查询（如查询某天的所有股票）
 --    - idx_stock_code: 加速按股票代码查询历史数据
+--    - idx_market: 加速按市场筛选
 --    - idx_date_range: 覆盖索引，优化日期范围查询性能
 --
 -- 使用示例：
 -- 1. 查询某股票的历史数据：
---    SELECT * FROM stock_daily WHERE stock_code = '600519' ORDER BY trade_date DESC;
+--    SELECT * FROM stock_daily WHERE stock_code = '600519' AND market = 'sh' ORDER BY trade_date DESC;
 --
 -- 2. 查询某天的所有股票：
 --    SELECT * FROM stock_daily WHERE trade_date = '2024-01-02';
 --
 -- 3. 查询某股票在某日期范围内的数据：
 --    SELECT * FROM stock_daily 
---    WHERE stock_code = '600519' 
+--    WHERE stock_code = '600519' AND market = 'sh'
 --    AND trade_date BETWEEN '2024-01-01' AND '2024-12-31'
 --    ORDER BY trade_date;
 --
@@ -98,8 +99,16 @@ WHERE sd.trade_date = (
 -- 5. 插入股票基本信息：
 --    INSERT INTO stock_basic (stock_code, market, stock_name) 
 --    VALUES ('600519', 'sh', '贵州茅台')
-
--- 3. 财经新闻表（财联社加红栏目）
+--
+-- 6. 插入股票日线数据：
+--    INSERT INTO stock_daily (stock_code, market, trade_date, open_price, high_price, low_price, close_price, minute_data)
+--    VALUES ('600519', 'sh', '2024-01-02', 1780.00, 1800.00, 1750.00, 1790.00, '[1780.0,1785.0,1790.0]')
+--    ON DUPLICATE KEY UPDATE 
+--        open_price = VALUES(open_price),
+--        high_price = VALUES(high_price),
+--        low_price = VALUES(low_price),
+--        close_price = VALUES(close_price),
+--        minute_data = VALUES(minute_data);
 CREATE TABLE IF NOT EXISTS `stock_daily_news` (
     `id` BIGINT UNSIGNED AUTO_INCREMENT COMMENT '主键ID',
     `news_id` VARCHAR(50) DEFAULT NULL COMMENT '新闻ID（来源网站唯一标识，用于排重）',

@@ -30,6 +30,11 @@ public class StockDaily {
     private String stockCode;
 
     /**
+     * 市场标识: sh-上海, sz-深圳
+     */
+    private String market;
+
+    /**
      * 交易日期
      */
     private LocalDate tradeDate;
