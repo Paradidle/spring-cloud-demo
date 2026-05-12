@@ -162,6 +162,19 @@ public class StrategiesController {
         return dashScopeAnalysisService.analyzeBoxPosition(code);
     }
 
+    // DashScope AI 批量分析所有股票并导出到Excel
+    @PostMapping("/analyze-all-stocks")
+    public String analyzeAllStocksAndExportToExcel() {
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(dashScopeAnalysisService::analyzeAllStocksAndExportToExcel);
+        return "批量分析任务已启动，请稍后检查结果";
+    }
+
+    // 从已有的JSON结果导出Excel（手动触发）
+    @PostMapping("/export-excel")
+    public String exportExcelFromExistingResults() {
+        return dashScopeAnalysisService.exportExcelFromExistingResults();
+    }
+
     @Data
     public static class SkillRequest {
         private String skillName;

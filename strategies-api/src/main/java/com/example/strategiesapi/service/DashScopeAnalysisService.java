@@ -25,4 +25,16 @@ public interface DashScopeAnalysisService {
      * @return 股票数据列表
      */
     List<Map<String, Object>> getRecentStockData(String stockCode, int days);
+
+    /**
+     * 批量分析所有股票的箱体位置并导出到Excel
+     * @return Excel文件路径
+     */
+    String analyzeAllStocksAndExportToExcel();
+
+    /**
+     * 从已有的JSON结果文件导出Excel
+     * @return 导出结果信息
+     */
+    String exportExcelFromExistingResults();
 }

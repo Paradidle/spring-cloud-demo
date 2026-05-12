@@ -8,9 +8,12 @@ import com.alibaba.fastjson.JSONObject;
 public class SinaApiTest {
     
     public static void main(String[] args) {
-        testStockList();
-        testStockDetail();
-        testStockHistory();
+
+        System.out.println(System.getProperty("user.dir"));
+//
+//        testStockList();
+//        testStockDetail();
+//        testStockHistory();
     }
     
     private static void testStockList() {
