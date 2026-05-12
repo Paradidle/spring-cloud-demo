@@ -85,10 +85,9 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
             String rawJson = callDashScopeAPI(prompt);
             
             // 尝试解析JSON并格式化输出
-            String formattedResult = formatAnalysisResult(rawJson, stockCode);
-            
+
             log.info("股票 {} 箱体分析完成", stockCode);
-            return formattedResult;
+            return rawJson;
             
         } catch (Exception e) {
             log.error("分析股票 {} 箱体位置时出错", stockCode, e);
@@ -142,6 +141,18 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
             result.put("R", jsonObject.getDoubleValue("R"));
             result.put("position", jsonObject.getString("position"));
             result.put("advice", jsonObject.getString("advice"));
+            result.put("validStrategy", jsonObject.getBooleanValue("validStrategy"));
+            
+            // 如果策略有效，添加箱体日期范围
+            if (jsonObject.getBooleanValue("validStrategy")) {
+                result.put("boxStartDate", jsonObject.getString("boxStartDate"));
+                result.put("boxEndDate", jsonObject.getString("boxEndDate"));
+            }
+            
+            // 如果策略无效，添加原因
+            if (!jsonObject.getBooleanValue("validStrategy")) {
+                result.put("reason", jsonObject.getString("reason"));
+            }
             
             // 生成简洁的格式化文本（仅用于显示，不存储到JSON文件）
             String formattedResult = String.format(
@@ -179,7 +190,9 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         // 获取所有非指数股票代码
         LambdaQueryWrapper<StockBasic> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(StockBasic::getIsIndex, false)
-               .select(StockBasic::getStockCode, StockBasic::getStockName).last("limit 100");
+               .select(StockBasic::getStockCode, StockBasic::getStockName)
+                .orderByDesc(StockBasic::getStockCode)
+                .last("limit 100");
         List<StockBasic> stocks = stockBasicService.list(wrapper);
         
         if (stocks.isEmpty()) {
@@ -338,6 +351,21 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
             jsonObject.put("R", result.get("R"));
             jsonObject.put("position", result.get("position"));
             jsonObject.put("advice", result.get("advice"));
+            jsonObject.put("validStrategy", result.get("validStrategy"));
+            
+            // 如果策略有效，添加箱体日期范围
+            if (result.containsKey("boxStartDate")) {
+                jsonObject.put("boxStartDate", result.get("boxStartDate"));
+            }
+            if (result.containsKey("boxEndDate")) {
+                jsonObject.put("boxEndDate", result.get("boxEndDate"));
+            }
+            
+            // 如果策略无效，添加原因
+            if (result.containsKey("reason")) {
+                jsonObject.put("reason", result.get("reason"));
+            }
+            
             jsonObject.put("summary", result.get("summary"));
             
             String jsonContent = jsonObject.toJSONString();
@@ -442,6 +470,21 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                         result.put("R", jsonObject.getDoubleValue("R"));
                         result.put("position", jsonObject.getString("position"));
                         result.put("advice", jsonObject.getString("advice"));
+                        result.put("validStrategy", jsonObject.getBooleanValue("validStrategy"));
+                        
+                        // 如果策略有效，添加箱体日期范围
+                        if (jsonObject.containsKey("boxStartDate")) {
+                            result.put("boxStartDate", jsonObject.getString("boxStartDate"));
+                        }
+                        if (jsonObject.containsKey("boxEndDate")) {
+                            result.put("boxEndDate", jsonObject.getString("boxEndDate"));
+                        }
+                        
+                        // 如果策略无效，添加原因
+                        if (jsonObject.containsKey("reason")) {
+                            result.put("reason", jsonObject.getString("reason"));
+                        }
+                        
                         result.put("summary", jsonObject.getString("summary"));
                         
                         results.add(result);
@@ -523,7 +566,7 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
             
             // 创建表头
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"股票代码", "股票名称", "箱顶价格", "箱底价格", "当前价格", "R值", "位置判断", "操作建议", "摘要"};
+            String[] headers = {"股票代码", "股票名称", "箱顶价格", "箱底价格", "当前价格", "R值", "位置判断", "操作建议", "策略有效性", "箱体开始日期", "箱体结束日期", "摘要"};
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
@@ -547,7 +590,10 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                 // 文本字段
                 row.createCell(6).setCellValue(getStringValue(result, "position"));
                 row.createCell(7).setCellValue(getStringValue(result, "advice"));
-                row.createCell(8).setCellValue(getStringValue(result, "summary"));
+                row.createCell(8).setCellValue(getStringValue(result, "validStrategy"));
+                row.createCell(9).setCellValue(getStringValue(result, "boxStartDate"));
+                row.createCell(10).setCellValue(getStringValue(result, "boxEndDate"));
+                row.createCell(11).setCellValue(getStringValue(result, "summary"));
             }
             
             // 自动调整列宽
@@ -558,7 +604,7 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                     sheet.setColumnWidth(i, 2000);
                 }
                 // 设置最大列宽（摘要列可以宽一些）
-                if (i == 8) {
+                if (i == 11) {
                     if (sheet.getColumnWidth(i) > 15000) {
                         sheet.setColumnWidth(i, 15000);
                     }
@@ -729,6 +775,7 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                 data.put("high", daily.getHighPrice());
                 data.put("low", daily.getLowPrice());
                 data.put("close", daily.getClosePrice());
+                data.put("volume", daily.getVolume()); // 添加交易量数据
                 return data;
             }).collect(Collectors.toList());
 
@@ -742,26 +789,60 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         StringBuilder sb = new StringBuilder();
         
         sb.append("【任务】股票箱体分析 - 请直接返回JSON格式结果，不要解释过程\n\n");
-        sb.append("【规则】\n");
+        sb.append("【箱体定义与识别规则】\n");
+        sb.append("核心思想：箱体从价格首次确立水平支撑或阻力区间开始，到价格有效突破该区间且后续不再返回箱体内部为止。\n\n");
+        
         sb.append("1.局部高点:High[i]>High[i-1]且High[i]>High[i+1]\n");
         sb.append("2.局部低点:Low[i]<Low[i-1]且Low[i]<Low[i+1]\n");
-        sb.append("3.聚类(价差≤0.5%),取最大簇平均值为箱顶/箱底\n");
-        sb.append("4.R=(现价-箱底)/(箱顶-箱底)\n");
-        sb.append("5.R>0.85顶部,R<0.15底部,0.4-0.6中部,R>1突破上,R<0突破下\n\n");
+        sb.append("3.聚类(价差≤0.5%),取最大簇平均值为箱顶/箱底\n\n");
         
-        sb.append("【数据】近120日K线(日期,开,高,低,收):\n");
+        sb.append("4.箱体有效性条件（必须同时满足）：\n");
+        sb.append("  a.箱体必须至少包含35个交易日数据\n");
+        sb.append("  b.箱顶-箱底 ≥ 过去20根K线平均真实波幅(ATR) × 0.5\n");
+        sb.append("  c.振幅 ≥ 2%（(箱顶-箱底)/箱底 ≥ 0.02）\n");
+        sb.append("  d.箱顶/箱底各自至少有两个局部极值点触碰\n\n");
+        
+        sb.append("5.箱体起点定义：箱底第一次被触及的日期或箱顶第一次被触及的日期，取两者中较早的那个日期\n");
+        sb.append("6.箱体终点定义：有效突破确认的那一天（见下方突破判定规则）\n\n");
+        
+        sb.append("7.有效突破判定：\n");
+        sb.append("  向上突破：连续两根K线的收盘价 > 箱顶 × 1.01，且突破后第一根K线成交量 ≥ 过去20日均量 × 1.2\n");
+        sb.append("  向下突破：连续两根K线的收盘价 < 箱底 × 0.99，成交量条件可放宽\n");
+        sb.append("  一旦确认有效突破，箱体终点 = 第二根突破K线的日期\n\n");
+        
+        sb.append("8.注意事项：\n");
+        sb.append("  a.不能简单将一个极值作为超大箱体，必须有明确的横盘震荡特征\n");
+        sb.append("  b.多个箱体按时间顺序排列，后一个箱体通常在前一个箱体被突破后才开始形成\n");
+        sb.append("  c.如果无法识别出符合要求的箱体，标记为不符合策略\n");
+        sb.append("  d.最后一个箱体如果没有被突破，则其终点为数据的最后一天\n\n");
+        
+        sb.append("9.R值计算：R=(现价-箱底)/(箱顶-箱底)\n");
+        sb.append("10.R值位置判断：R>0.85顶部,R<0.15底部,0.4-0.6中部,R>1突破上,R<0突破下\n\n");
+        
+        sb.append("11.放量和缩量定义：当天交易量相比前7天平均交易量±50%\n");
+        sb.append("12.交易信号判断：\n");
+        sb.append("  a.突破前高或箱体顶部出现上影线且放量->卖出\n");
+        sb.append("  b.箱体高位放量滞涨->卖出\n");
+        sb.append("  c.箱体底部缩量->买入\n");
+        sb.append("  d.箱体中高位突破上/下->观望\n\n");
+        
+        sb.append("【数据】近120日K线(日期,开,高,低,收,成交量):\n");
 
         for (int i = 0; i < stockData.size(); i++) {
             Map<String, Object> data = stockData.get(i);
-            sb.append(String.format("%s,%s,%s,%s,%s\n",
+            sb.append(String.format("%s,%s,%s,%s,%s,%s\n",
                     data.get("date"),
                     data.get("open"),
                     data.get("high"),
                     data.get("low"),
-                    data.get("close")));
+                    data.get("close"),
+                    data.get("volume")));
         }
         
-        sb.append("\n【要求】直接返回JSON,格式:{\"boxTop\":箱顶价格,\"boxBottom\":箱底价格,\"currentPrice\":最新收盘价,\"R\":R值,\"position\":位置(顶部/底部/中部/突破上/突破下),\"advice\":一句话建议}\n");
+        sb.append("\n【要求】直接返回JSON,格式:\n");
+        sb.append("如果符合策略:{\"boxTop\":箱顶价格,\"boxBottom\":箱底价格,\"currentPrice\":最新收盘价,\"R\":R值,\"position\":位置(顶部/底部/中部/突破上/突破下),\"advice\":建议（卖出/买入/观望）,\"validStrategy\":true,\"boxStartDate\":箱体开始日期(YYYY-MM-DD格式),\"boxEndDate\":箱体结束日期(YYYY-MM-DD格式)}\n");
+        sb.append("如果不符合策略:{\"validStrategy\":false,\"reason\":\"原因说明（如：箱体交易日不足35天/振幅不足2%/极值点不足等）\"}\n");
+        sb.append("重要：必须返回明确的箱体开始和结束日期，不能简单将第一个和最后一个数据点作为箱体范围！\n");
         sb.append("不要任何解释,只要JSON!");
         
         return sb.toString();
