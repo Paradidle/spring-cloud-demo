@@ -191,8 +191,8 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         LambdaQueryWrapper<StockBasic> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(StockBasic::getIsIndex, false)
                .select(StockBasic::getStockCode, StockBasic::getStockName)
-                .orderByDesc(StockBasic::getStockCode)
-                .last("limit 100");
+                .orderByDesc(StockBasic::getStockCode);
+//                .last("limit 100");
         List<StockBasic> stocks = stockBasicService.list(wrapper);
         
         if (stocks.isEmpty()) {
@@ -215,6 +215,10 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         
         log.info("待分析股票数量: {}", pendingStocks.size());
         
+        // 第一步：分析上证指数当前位置
+        String marketStrategy = analyzeMarketIndexPosition();
+        log.info("大盘策略分析完成: {}", marketStrategy);
+        
         // 创建线程池进行并行处理
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         List<Future<Map<String, Object>>> futures = new ArrayList<>();
@@ -225,6 +229,7 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         
         // 提交分析任务
         for (StockBasic stock : pendingStocks) {
+            String finalMarketStrategy = marketStrategy; // 用于lambda表达式
             futures.add(executor.submit(() -> {
                 try {
                     // 使用新方法直接获取结构化数据
@@ -232,6 +237,10 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                     
                     // 补充股票名称
                     result.put("stockName", stock.getStockName());
+                    
+                    // 应用后置策略：根据大盘位置判断板块匹配度
+                    String strategyAdvice = applyPostStrategy(stock.getStockName(), result, finalMarketStrategy);
+                    result.put("strategyAdvice", strategyAdvice);
                     
                     // 保存单个股票的结果到文件
                     saveSingleStockResult(result);
@@ -368,6 +377,11 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
             
             jsonObject.put("summary", result.get("summary"));
             
+            // 添加后置策略建议（包含AI评级）
+            if (result.containsKey("strategyAdvice")) {
+                jsonObject.put("strategyAdvice", result.get("strategyAdvice"));
+            }
+            
             String jsonContent = jsonObject.toJSONString();
             Files.write(filePath, jsonContent.getBytes("UTF-8"));
             
@@ -487,6 +501,19 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                         
                         result.put("summary", jsonObject.getString("summary"));
                         
+                        // 加载后置策略建议
+                        if (jsonObject.containsKey("strategyAdvice")) {
+                            String strategyAdvice = jsonObject.getString("strategyAdvice");
+                            result.put("strategyAdvice", strategyAdvice);
+                            
+                            // 解析出星级和理由（单独字段）
+                            Map<String, String> parsedStrategy = parseStrategyAdvice(strategyAdvice);
+                            result.put("rating", parsedStrategy.get("rating"));
+                            result.put("reason", parsedStrategy.get("reason"));
+                            result.put("sector", parsedStrategy.get("sector"));
+                            result.put("suggestion", parsedStrategy.get("suggestion"));
+                        }
+                        
                         results.add(result);
                     } catch (Exception e) {
                         log.error("读取结果文件失败: {}", path, e);
@@ -502,71 +529,15 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
     }
     
     /**
-     * 从分析结果文本中提取数值（用于旧格式的JSON文件）
-     */
-    private void extractDataFromAnalysisText(Map<String, Object> result, String text) {
-        if (text == null || text.isEmpty()) {
-            return;
-        }
-        
-        try {
-            // 提取箱顶价格: 10.78 元
-            java.util.regex.Pattern boxTopPattern = java.util.regex.Pattern.compile("箱顶价格:\\s*([\\d.]+)");
-            java.util.regex.Matcher boxTopMatcher = boxTopPattern.matcher(text);
-            if (boxTopMatcher.find()) {
-                result.put("boxTop", Double.parseDouble(boxTopMatcher.group(1)));
-            }
-            
-            // 提取箱底价格: 9.6 元
-            java.util.regex.Pattern boxBottomPattern = java.util.regex.Pattern.compile("箱底价格:\\s*([\\d.]+)");
-            java.util.regex.Matcher boxBottomMatcher = boxBottomPattern.matcher(text);
-            if (boxBottomMatcher.find()) {
-                result.put("boxBottom", Double.parseDouble(boxBottomMatcher.group(1)));
-            }
-            
-            // 提取当前价格: 10.77 元
-            java.util.regex.Pattern currentPricePattern = java.util.regex.Pattern.compile("当前价格:\\s*([\\d.]+)");
-            java.util.regex.Matcher currentPriceMatcher = currentPricePattern.matcher(text);
-            if (currentPriceMatcher.find()) {
-                result.put("currentPrice", Double.parseDouble(currentPriceMatcher.group(1)));
-            }
-            
-            // 提取相对位置R: 0.95
-            java.util.regex.Pattern rPattern = java.util.regex.Pattern.compile("相对位置R:\\s*([\\d.]+)");
-            java.util.regex.Matcher rMatcher = rPattern.matcher(text);
-            if (rMatcher.find()) {
-                result.put("R", Double.parseDouble(rMatcher.group(1)));
-            }
-            
-            // 提取位置判断: 顶部
-            java.util.regex.Pattern positionPattern = java.util.regex.Pattern.compile("位置判断:\\s*(\\S+)");
-            java.util.regex.Matcher positionMatcher = positionPattern.matcher(text);
-            if (positionMatcher.find()) {
-                result.put("position", positionMatcher.group(1));
-            }
-            
-            // 提取操作建议
-            java.util.regex.Pattern advicePattern = java.util.regex.Pattern.compile("操作建议:\\s*(.+)", java.util.regex.Pattern.DOTALL);
-            java.util.regex.Matcher adviceMatcher = advicePattern.matcher(text);
-            if (adviceMatcher.find()) {
-                result.put("advice", adviceMatcher.group(1).trim());
-            }
-            
-        } catch (Exception e) {
-            log.warn("从文本中提取数据失败", e);
-        }
-    }
-    
-    /**
      * 将结果导出到指定的Excel文件
      */
     private void exportResultsToExcelFile(List<Map<String, Object>> results, String filePath) {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("股票箱体分析结果");
             
-            // 创建表头
+            // 创建表头 - 精简版，星级和理由放在前面
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"股票代码", "股票名称", "箱顶价格", "箱底价格", "当前价格", "R值", "位置判断", "操作建议", "策略有效性", "箱体开始日期", "箱体结束日期", "摘要"};
+            String[] headers = {"股票代码", "股票名称", "推荐星级", "推荐理由", "所属板块", "操作建议", "箱顶价格", "箱底价格", "当前价格", "R值", "位置判断", "基础建议"};
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
@@ -581,19 +552,21 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                 row.createCell(0).setCellValue(getStringValue(result, "stockCode"));
                 row.createCell(1).setCellValue(getStringValue(result, "stockName"));
                 
-                // 数值字段 - 直接映射
-                row.createCell(2).setCellValue(getDoubleValue(result, "boxTop"));
-                row.createCell(3).setCellValue(getDoubleValue(result, "boxBottom"));
-                row.createCell(4).setCellValue(getDoubleValue(result, "currentPrice"));
-                row.createCell(5).setCellValue(getDoubleValue(result, "R"));
+                // 推荐星级和理由（放在前面）
+                row.createCell(2).setCellValue(getStringValue(result, "rating"));
+                row.createCell(3).setCellValue(getStringValue(result, "reason"));
+                row.createCell(4).setCellValue(getStringValue(result, "sector"));
+                row.createCell(5).setCellValue(getStringValue(result, "suggestion"));
+                
+                // 数值字段
+                row.createCell(6).setCellValue(getDoubleValue(result, "boxTop"));
+                row.createCell(7).setCellValue(getDoubleValue(result, "boxBottom"));
+                row.createCell(8).setCellValue(getDoubleValue(result, "currentPrice"));
+                row.createCell(9).setCellValue(getDoubleValue(result, "R"));
                 
                 // 文本字段
-                row.createCell(6).setCellValue(getStringValue(result, "position"));
-                row.createCell(7).setCellValue(getStringValue(result, "advice"));
-                row.createCell(8).setCellValue(getStringValue(result, "validStrategy"));
-                row.createCell(9).setCellValue(getStringValue(result, "boxStartDate"));
-                row.createCell(10).setCellValue(getStringValue(result, "boxEndDate"));
-                row.createCell(11).setCellValue(getStringValue(result, "summary"));
+                row.createCell(10).setCellValue(getStringValue(result, "position"));
+                row.createCell(11).setCellValue(getStringValue(result, "advice"));
             }
             
             // 自动调整列宽
@@ -603,8 +576,8 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
                 if (sheet.getColumnWidth(i) < 2000) {
                     sheet.setColumnWidth(i, 2000);
                 }
-                // 设置最大列宽（摘要列可以宽一些）
-                if (i == 11) {
+                // 设置最大列宽（推荐理由和建议列可以宽一些）
+                if (i == 3 || i == 5 || i == 11) {
                     if (sheet.getColumnWidth(i) > 15000) {
                         sheet.setColumnWidth(i, 15000);
                     }
@@ -847,5 +820,323 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         sb.append("不要任何解释,只要JSON!");
         
         return sb.toString();
+    }
+    
+    /**
+     * 分析上证指数当前位置
+     */
+    private String analyzeMarketIndexPosition() {
+        log.info("开始分析上证指数(000001)箱体位置");
+        
+        try {
+            // 获取上证指数的K线数据
+            Map<String, Object> marketResult = analyzeBoxPositionWithStructuredData("sh000001");
+            
+            if (marketResult == null || !Boolean.TRUE.equals(marketResult.get("validStrategy"))) {
+                log.warn("上证指数箱体分析失败，使用默认策略");
+                return "AGGRESSIVE"; // 默认进攻型
+            }
+            
+            Double rValue = (Double) marketResult.get("R");
+            String position = (String) marketResult.get("position");
+            
+            log.info("上证指数 R值: {}, 位置: {}", rValue, position);
+            
+            // 根据R值判断大盘策略
+            if (rValue != null) {
+                if (rValue > 0.75) {
+                    log.info("大盘处于箱顶区域 -> 防守型策略");
+                    return "DEFENSIVE";
+                } else if (rValue < 0.25) {
+                    log.info("大盘处于箱底区域 -> 复苏型策略");
+                    return "RECOVERY";
+                } else {
+                    log.info("大盘处于中部区域 -> 进攻型策略");
+                    return "AGGRESSIVE";
+                }
+            }
+            
+            return "AGGRESSIVE"; // 默认
+            
+        } catch (Exception e) {
+            log.error("分析上证指数失败", e);
+            return "AGGRESSIVE"; // 出错时使用默认策略
+        }
+    }
+    
+    /**
+     * 应用后置策略：调用AI模型识别板块并综合评估
+     */
+    private String applyPostStrategy(String stockName, Map<String, Object> stockResult, String marketStrategy) {
+        // 检查策略是否有效
+        Boolean validStrategy = (Boolean) stockResult.get("validStrategy");
+        if (validStrategy == null || !validStrategy) {
+            return "不符合箱体策略";
+        }
+        
+        // 获取个股箱体信息
+        String position = (String) stockResult.get("position");
+        Double rValue = (Double) stockResult.get("R");
+        Double boxTop = (Double) stockResult.get("boxTop");
+        Double boxBottom = (Double) stockResult.get("boxBottom");
+        Double currentPrice = (Double) stockResult.get("currentPrice");
+        String advice = (String) stockResult.get("advice");
+        
+        // 构建AI分析的上下文信息
+        String marketContext = getMarketContextDescription(marketStrategy);
+        
+        // 调用AI模型进行板块识别和综合评估
+        try {
+            String aiPrompt = buildPostStrategyPrompt(
+                stockName, marketStrategy, marketContext,
+                position, rValue, boxTop, boxBottom, currentPrice, advice
+            );
+            
+            String aiResponse = callDashScopeAPI(aiPrompt);
+            
+            // 解析AI返回的JSON
+            JSONObject jsonObject = JSON.parseObject(extractJsonFromResult(aiResponse));
+            
+            // 构建格式化的策略建议
+            StringBuilder resultAdvice = new StringBuilder();
+            resultAdvice.append("【大盘】").append(marketContext);
+            resultAdvice.append(" | 【个股】").append(position != null ? position : "未知");
+            
+            // 添加AI识别的板块
+            String identifiedSector = jsonObject.getString("identifiedSector");
+            if (identifiedSector != null && !identifiedSector.isEmpty()) {
+                resultAdvice.append(" | 【板块】").append(identifiedSector);
+            }
+            
+            // 添加AI的评级和建议
+            String rating = jsonObject.getString("rating");
+            String reason = jsonObject.getString("reason");
+            String suggestion = jsonObject.getString("suggestion");
+            
+            if (rating != null && !rating.isEmpty()) {
+                resultAdvice.append(" | ").append(rating);
+            }
+            if (reason != null && !reason.isEmpty()) {
+                resultAdvice.append(" | 理由:").append(reason);
+            }
+            if (suggestion != null && !suggestion.isEmpty()) {
+                resultAdvice.append(" | 建议:").append(suggestion);
+            }
+            
+            return resultAdvice.toString();
+            
+        } catch (Exception e) {
+            log.error("AI评估失败，使用规则降级: {}", stockName, e);
+            // AI失败时使用基于规则的降级方案
+            return applyRuleBasedStrategy(stockName, stockResult, marketStrategy);
+        }
+    }
+    
+    /**
+     * 获取大盘策略描述
+     */
+    private String getMarketContextDescription(String marketStrategy) {
+        switch (marketStrategy) {
+            case "DEFENSIVE":
+                return "箱顶-防守为主";
+            case "RECOVERY":
+                return "箱底-布局复苏";
+            case "AGGRESSIVE":
+            default:
+                return "中部-积极进攻";
+        }
+    }
+    
+    /**
+     * 构建后置策略AI Prompt
+     */
+    private String buildPostStrategyPrompt(
+        String stockName, String marketStrategy, String marketContext,
+        String position, Double rValue, Double boxTop, Double boxBottom, 
+        Double currentPrice, String advice
+    ) {
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("【任务】股票投资策略综合评估（含板块识别）\n\n");
+        
+        sb.append("【当前市场环境】\n");
+        sb.append("大盘状态: ").append(marketContext).append("\n");
+        sb.append("策略类型: ").append(marketStrategy).append("\n\n");
+        
+        sb.append("【个股信息】\n");
+        sb.append("股票名称: ").append(stockName).append("\n");
+        sb.append("箱体位置: ").append(position != null ? position : "未知").append("\n");
+        if (rValue != null) {
+            sb.append("R值: ").append(String.format("%.2f", rValue)).append("\n");
+        }
+        if (boxTop != null && boxBottom != null && currentPrice != null) {
+            sb.append(String.format("箱顶: %.2f, 箱底: %.2f, 现价: %.2f\n", boxTop, boxBottom, currentPrice));
+        }
+        if (advice != null) {
+            sb.append("基础建议: ").append(advice).append("\n");
+        }
+        
+        sb.append("\n【评估要求】\n");
+        sb.append("1. **板块识别**：根据股票名称，判断该股票属于哪个行业板块\n");
+        sb.append("   - 例如：贵州茅台 → 白酒/消费板块\n");
+        sb.append("   - 例如：宁德时代 → 新能源/锂电池板块\n");
+        sb.append("   - 例如：工商银行 → 银行板块\n");
+        sb.append("   - 例如：中国旅游 → 旅游板块\n");
+        sb.append("2. **板块匹配度**：判断该股票所属板块是否符合当前大盘推荐的板块类型\n");
+        sb.append("   - 防守型(DA FENSIVE)推荐：银行、农业、军工、能源等\n");
+        sb.append("   - 进攻型(AGGRESSIVE)推荐：科技、半导体、光刻机、机器人等\n");
+        sb.append("   - 复苏型(RECOVERY)推荐：旅游、酒店、物流、航运、中药等\n");
+        sb.append("3. **位置评估**：评估个股在箱体中的相对位置（R值）\n");
+        sb.append("4. **综合评级**：综合考虑大盘环境、板块匹配、个股位置，给出投资评级\n\n");
+        
+        sb.append("【评级标准】\n");
+        sb.append("⭐⭐⭐ 完美选股：大盘底部+个股箱底+板块匹配复苏策略，或大盘顶部+个股箱顶+板块匹配防守策略\n");
+        sb.append("⭐⭐ 优秀选股：大盘与个股位置合理，板块基本匹配\n");
+        sb.append("⭐ 关注：有一定机会但存在风险\n");
+        sb.append("⚠️ 观望：位置不佳或板块不匹配\n");
+        sb.append("❌ 不推荐：明显不符合当前策略\n\n");
+        
+        sb.append("【输出格式】直接返回JSON：\n");
+        sb.append("{\n");
+        sb.append("  \"identifiedSector\": \"识别出的板块名称\",\n");
+        sb.append("  \"sectorMatch\": \"板块是否匹配当前策略（是/否）\",\n");
+        sb.append("  \"rating\": \"评级（⭐⭐⭐/⭐⭐/⭐/⚠️/❌）\",\n");
+        sb.append("  \"reason\": \"简短说明理由（30字以内）\",\n");
+        sb.append("  \"suggestion\": \"操作建议（买入/观望/卖出，10字以内）\"\n");
+        sb.append("}\n\n");
+        
+        sb.append("注意：只返回JSON，不要任何解释！");
+        
+        return sb.toString();
+    }
+    
+    /**
+     * 基于规则的降级策略（当AI失败时使用）
+     */
+    private String applyRuleBasedStrategy(String stockName, Map<String, Object> stockResult, String marketStrategy) {
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("【大盘】").append(getMarketContextDescription(marketStrategy));
+        sb.append(" | 【个股】").append(stockResult.get("position"));
+        sb.append(" | 【板块】基于规则评估");
+        
+        // 简单的板块判断逻辑
+        String sectorType = inferSectorType(stockName);
+        boolean sectorMatch = checkSectorMatch(sectorType, marketStrategy);
+        
+        sb.append(" | ").append(sectorMatch ? "板块匹配" : "板块不匹配");
+        
+        // 简单评级
+        String rating = sectorMatch ? "⭐⭐" : "⭐";
+        sb.append(" | ").append(rating);
+        
+        sb.append(" | 理由:规则评估");
+        sb.append(" | 建议:").append(sectorMatch ? "可关注" : "谨慎");
+        
+        return sb.toString();
+    }
+    
+    /**
+     * 推断股票所属板块类型（简化版）
+     */
+    private String inferSectorType(String stockName) {
+        if (stockName == null) return "UNKNOWN";
+        
+        // 防守型板块关键词
+        if (stockName.contains("银行") || stockName.contains("保险") || 
+            stockName.contains("农业") || stockName.contains("能源") ||
+            stockName.contains("石油") || stockName.contains("煤炭")) {
+            return "DEFENSIVE";
+        }
+        
+        // 进攻型板块关键词
+        if (stockName.contains("科技") || stockName.contains("电子") || 
+            stockName.contains("芯片") || stockName.contains("半导体") ||
+            stockName.contains("机器人") || stockName.contains("智能")) {
+            return "AGGRESSIVE";
+        }
+        
+        // 复苏型板块关键词
+        if (stockName.contains("旅游") || stockName.contains("酒店") || 
+            stockName.contains("航空") || stockName.contains("物流") ||
+            stockName.contains("中药") || stockName.contains("医药")) {
+            return "RECOVERY";
+        }
+        
+        return "UNKNOWN";
+    }
+    
+    /**
+     * 检查板块是否匹配当前策略
+     */
+    private boolean checkSectorMatch(String sectorType, String marketStrategy) {
+        if ("UNKNOWN".equals(sectorType)) {
+            return false;
+        }
+        // 板块类型与策略类型一致即为匹配
+        return sectorType.equals(marketStrategy);
+    }
+    
+    /**
+     * 解析策略建议字符串，提取星级、理由、板块、建议等字段
+     */
+    private Map<String, String> parseStrategyAdvice(String strategyAdvice) {
+        Map<String, String> result = new HashMap<>();
+        
+        if (strategyAdvice == null || strategyAdvice.isEmpty()) {
+            result.put("rating", "");
+            result.put("reason", "");
+            result.put("sector", "");
+            result.put("suggestion", "");
+            return result;
+        }
+        
+        // 示例格式：【大盘】箱底-布局复苏 | 【个股】底部 | 【板块】白酒/消费 | ⭐⭐⭐ | 理由:xxx | 建议:xxx
+        
+        // 提取板块
+        int sectorStart = strategyAdvice.indexOf("【板块】");
+        if (sectorStart != -1) {
+            int sectorEnd = strategyAdvice.indexOf(" |", sectorStart + 4);
+            if (sectorEnd == -1) sectorEnd = strategyAdvice.length();
+            String sector = strategyAdvice.substring(sectorStart + 4, sectorEnd).trim();
+            result.put("sector", sector);
+        } else {
+            result.put("sector", "");
+        }
+        
+        // 提取星级（查找⭐符号）
+        int ratingStart = strategyAdvice.indexOf("⭐");
+        if (ratingStart != -1) {
+            int ratingEnd = strategyAdvice.indexOf(" |", ratingStart);
+            if (ratingEnd == -1) ratingEnd = strategyAdvice.length();
+            String rating = strategyAdvice.substring(ratingStart, ratingEnd).trim();
+            result.put("rating", rating);
+        } else {
+            result.put("rating", "");
+        }
+        
+        // 提取理由
+        int reasonStart = strategyAdvice.indexOf("理由:");
+        if (reasonStart != -1) {
+            int reasonEnd = strategyAdvice.indexOf(" |", reasonStart + 3);
+            if (reasonEnd == -1) reasonEnd = strategyAdvice.length();
+            String reason = strategyAdvice.substring(reasonStart + 3, reasonEnd).trim();
+            result.put("reason", reason);
+        } else {
+            result.put("reason", "");
+        }
+        
+        // 提取建议
+        int suggestionStart = strategyAdvice.indexOf("建议:");
+        if (suggestionStart != -1) {
+            int suggestionEnd = strategyAdvice.indexOf(" |", suggestionStart + 3);
+            if (suggestionEnd == -1) suggestionEnd = strategyAdvice.length();
+            String suggestion = strategyAdvice.substring(suggestionStart + 3, suggestionEnd).trim();
+            result.put("suggestion", suggestion);
+        } else {
+            result.put("suggestion", "");
+        }
+        
+        return result;
     }
 }
