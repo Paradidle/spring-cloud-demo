@@ -819,11 +819,12 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         sb.append("9.R值计算：R=(现价-箱底)/(箱顶-箱底)\n");
         sb.append("10.R值位置判断：R>0.85顶部,R<0.15底部,0.4-0.6中部,R>1突破上,R<0突破下\n\n");
         
-        sb.append("11.放量和缩量定义：当天交易量相比前7天平均交易量±50%\n");
+        sb.append("11.放量定义：当天交易量相比前7天平均交易量超过50%；缩量定义：当天交易量相比前7天平均交易量低于50%\n");
+        sb.append("12.站稳定义：股价在某一价位连续3个交易日收盘价均不低于该价位，且期间未出现单日跌幅超过3%的情况\n");
         sb.append("12.交易信号判断：\n");
         sb.append("  a.突破前高或箱体顶部出现上影线且放量->卖出\n");
         sb.append("  b.箱体高位放量滞涨->卖出\n");
-        sb.append("  c.箱体底部缩量->买入\n");
+        sb.append("  c.箱体底部缩量并且站稳->买入\n");
         sb.append("  d.箱体中高位突破上/下->观望\n\n");
         
         sb.append("【数据】近120日K线(日期,开,高,低,收,成交量):\n");
