@@ -983,7 +983,7 @@ public class DashScopeAnalysisServiceImpl implements DashScopeAnalysisService {
         sb.append("   - 例如：工商银行 → 银行板块\n");
         sb.append("   - 例如：中国旅游 → 旅游板块\n");
         sb.append("2. **板块匹配度**：判断该股票所属板块是否符合当前大盘推荐的板块类型\n");
-        sb.append("   - 防守型(DA FENSIVE)推荐：银行、农业、军工、能源等\n");
+        sb.append("   - 防守型(DEFENSIVE)推荐：银行、农业、军工、能源等\n");
         sb.append("   - 进攻型(AGGRESSIVE)推荐：科技、半导体、光刻机、机器人等\n");
         sb.append("   - 复苏型(RECOVERY)推荐：旅游、酒店、物流、航运、中药等\n");
         sb.append("3. **位置评估**：评估个股在箱体中的相对位置（R值）\n");
